@@ -1,6 +1,6 @@
 {
   "name": "word-warrior",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "单词小勇士 - 趣味学习抽取工具",
   "main": "main.js",
   "scripts": {
@@ -18,7 +18,7 @@
   },
   "build": {
     "appId": "com.wordwarrior.app",
-    "productName": "单词小勇士",
+    "productName": "word-warrior",
     "publish": null,
     "directories": {
       "output": "dist"
@@ -40,6 +40,9 @@
         }
       ],
       "icon": "assets/icon.icns"
+    },
+    "dmg": {
+      "writeUpdateInfo": false
     },
     "win": {
       "target": [
