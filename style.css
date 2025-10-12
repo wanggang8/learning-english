@@ -1,0 +1,472 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'KaiTi', 'STKaiti', '楷体', serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+.container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* 背景装饰 - 星星和爱心 */
+.background-decoration {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.background-decoration::before,
+.background-decoration::after {
+    content: '✨';
+    position: absolute;
+    font-size: 2rem;
+    animation: float 3s ease-in-out infinite;
+}
+
+.background-decoration::before {
+    top: 10%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.background-decoration::after {
+    content: '💖';
+    top: 20%;
+    right: 15%;
+    animation-delay: 1.5s;
+}
+
+/* 人物图像 */
+.character-image {
+    position: absolute;
+    left: 5%;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 700px;
+    height: 700px;
+    background-image: url('assets/images/character.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(-50%) scale(1); }
+    50% { transform: translateY(-55%) scale(1.05); }
+}
+
+/* 主内容区 */
+.main-content {
+    position: relative;
+    z-index: 10;
+    width: 50%;
+    max-width: 800px;
+    text-align: center;
+    margin-right: 10%;
+    margin-left: auto;
+}
+
+/* 屏幕切换 */
+.screen {
+    display: none;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.screen.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* 标题样式 */
+.title {
+    font-size: 4.5rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    background: linear-gradient(45deg, #ff6b9d, #ffd93d, #6bcf7f, #4d96ff);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 
+        3px 3px 0 rgba(255,255,255,0.3),
+        5px 5px 10px rgba(0,0,0,0.2);
+    margin-bottom: 3rem;
+    font-weight: bold;
+    letter-spacing: 0.3rem;
+    animation: rainbowText 5s ease infinite;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));
+}
+
+@keyframes rainbowText {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.title-small {
+    font-size: 3.5rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    color: #fff;
+    text-shadow: 
+        3px 3px 0 #ff6b9d,
+        5px 5px 10px rgba(0,0,0,0.3);
+    margin-bottom: 2rem;
+    font-weight: bold;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));
+}
+
+.subtitle {
+    font-size: 2.2rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    color: #fff;
+    text-shadow: 
+        2px 2px 0 #ff6b9d,
+        4px 4px 8px rgba(0,0,0,0.3);
+    margin-bottom: 2rem;
+    font-weight: bold;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));
+}
+
+/* 名字显示区域 */
+.name-display {
+    background: linear-gradient(135deg, #fff 0%, #ffe5f5 100%);
+    border: 6px solid #ff6b9d;
+    border-radius: 30px;
+    padding: 3rem 2rem;
+    margin: 2rem auto;
+    min-height: 150px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 
+        0 15px 40px rgba(255,107,157,0.4),
+        inset 0 0 30px rgba(255,255,255,0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.name-display::before {
+    content: '⭐';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 2rem;
+    animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.name-display.rolling {
+    font-size: 4rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    color: #ff6b9d;
+    font-weight: bold;
+    animation: pulse 0.5s ease-in-out infinite;
+}
+
+.name-display.result {
+    font-size: 5rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    background: linear-gradient(45deg, #ff6b9d, #ffd93d, #6bcf7f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+    animation: scaleIn 0.5s ease-out, rainbowText 3s ease infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes scaleIn {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* 单词网格 */
+.word-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.word-item {
+    background: linear-gradient(135deg, #fff 0%, #fff5e6 100%);
+    border: 6px solid #ffd93d;
+    border-radius: 25px;
+    padding: 3rem 2rem;
+    font-size: 4rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    background: linear-gradient(45deg, #ff6b9d, #ffd93d, #6bcf7f, #4d96ff);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+    box-shadow: 
+        0 10px 30px rgba(255,217,61,0.4),
+        inset 0 0 30px rgba(255,255,255,0.5);
+    animation: wordAppear 0.5s ease-out backwards, rainbowText 5s ease infinite;
+    position: relative;
+}
+
+.word-item::before {
+    content: '🌟';
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    font-size: 2.5rem;
+    animation: bounce 1s ease infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.word-item:nth-child(1) { animation-delay: 0.1s; }
+.word-item:nth-child(2) { animation-delay: 0.2s; }
+.word-item:nth-child(3) { animation-delay: 0.3s; }
+.word-item:nth-child(4) { animation-delay: 0.4s; }
+.word-item:nth-child(5) { animation-delay: 0.5s; }
+.word-item:nth-child(6) { animation-delay: 0.6s; }
+
+@keyframes wordAppear {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px) scale(0.8);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 按钮样式 */
+.btn-primary, .btn-secondary, .btn-back {
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    font-size: 2rem;
+    font-weight: bold;
+    padding: 1.5rem 4rem;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    letter-spacing: 0.1rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #ff6b9d, #ffd93d);
+    color: white;
+    border: 4px solid #fff;
+}
+
+.btn-primary:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 15px 40px rgba(255,107,157,0.5);
+}
+
+.btn-primary::before {
+    content: '✨';
+    position: absolute;
+    left: 20px;
+    font-size: 1.5rem;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #6bcf7f, #4d96ff);
+    color: white;
+    border: 4px solid #fff;
+    margin-top: 1rem;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 15px 40px rgba(107,207,127,0.5);
+}
+
+.btn-secondary::before {
+    content: '🎯';
+    position: absolute;
+    left: 20px;
+    font-size: 1.5rem;
+}
+
+.btn-back {
+    background: linear-gradient(135deg, #a78bfa, #ec4899);
+    color: white;
+    border: 4px solid #fff;
+    margin-top: 2rem;
+}
+
+.btn-back:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 15px 40px rgba(167,139,250,0.5);
+}
+
+.btn-back::before {
+    content: '🏠';
+    position: absolute;
+    left: 20px;
+    font-size: 1.5rem;
+}
+
+/* 音乐控制按钮 */
+.music-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: 3px solid #ffd700;
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.music-toggle:hover {
+    transform: scale(1.1);
+}
+
+.music-toggle.muted {
+    opacity: 0.5;
+}
+
+/* 模态框 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    animation: fadeIn 0.3s ease;
+}
+
+.modal.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #fff 0%, #ffe0e0 100%);
+    padding: 3rem;
+    border-radius: 20px;
+    border: 5px solid #ffd700;
+    box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+    max-width: 600px;
+    width: 90%;
+    animation: scaleIn 0.3s ease;
+}
+
+.modal-content h3 {
+    font-size: 2rem;
+    color: #d32f2f;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+#wordInput {
+    width: 100%;
+    min-height: 200px;
+    font-size: 1.5rem;
+    padding: 1rem;
+    border: 3px solid #ffd700;
+    border-radius: 10px;
+    font-family: 'KaiTi', 'STKaiti', '楷体', serif;
+    resize: vertical;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+
+.modal-buttons button {
+    padding: 1rem 3rem;
+    font-size: 1.5rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .title {
+        font-size: 3rem;
+        letter-spacing: 0.2rem;
+    }
+    
+    .title-small {
+        font-size: 2.5rem;
+    }
+    
+    .subtitle {
+        font-size: 1.8rem;
+    }
+    
+    .name-display.rolling {
+        font-size: 2.5rem;
+    }
+    
+    .name-display.result {
+        font-size: 3rem;
+    }
+    
+    .character-image {
+        width: 200px;
+        height: 300px;
+        right: 5%;
+    }
+    
+    .btn-primary, .btn-secondary, .btn-back {
+        font-size: 1.5rem;
+        padding: 1rem 2rem;
+    }
+    
+    .word-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+    
+    .word-item {
+        font-size: 1.5rem;
+        padding: 1.5rem 0.5rem;
+    }
+}

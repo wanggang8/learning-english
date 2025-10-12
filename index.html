@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 单词小勇士 - 趣味学习</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="assets/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- 背景音乐 -->
+    <audio id="bgMusic" loop>
+        <source src="assets/music.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 背景装饰 -->
+        <div class="background-decoration"></div>
+        
+        <!-- 人物图像 -->
+        <div class="character-image"></div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 初始页面 -->
+            <div id="startScreen" class="screen active">
+                <h1 class="title">🌟 单词小勇士 🌟</h1>
+                <button class="btn-primary" onclick="startDrawing()">开始冒险</button>
+            </div>
+
+            <!-- 抽取中页面 -->
+            <div id="drawingScreen" class="screen">
+                <h1 class="title-small">🎯 抽取中...</h1>
+                <div class="name-display rolling" id="rollingName"></div>
+            </div>
+
+            <!-- 结果页面 -->
+            <div id="resultScreen" class="screen">
+                <h2 class="subtitle">🎉 恭喜！幸运小勇士是</h2>
+                <div class="name-display result" id="selectedName"></div>
+                <button class="btn-secondary" onclick="showWordInput()">抽取单词</button>
+            </div>
+
+            <!-- 单词显示页面 -->
+            <div id="wordScreen" class="screen">
+                <h2 class="subtitle">💪 加油！你的单词是</h2>
+                <div class="word-grid" id="wordGrid"></div>
+                <button class="btn-back" onclick="resetToStart()">继续冒险</button>
+            </div>
+        </div>
+
+        <!-- 音乐控制按钮 -->
+        <button class="music-toggle" onclick="toggleMusic()" id="musicBtn">🔊</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
