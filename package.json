@@ -1,6 +1,6 @@
 {
   "name": "word-warrior",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "单词小勇士 - 趣味学习抽取工具",
   "main": "main.js",
   "scripts": {
