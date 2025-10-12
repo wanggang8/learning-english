@@ -19,6 +19,7 @@
   "build": {
     "appId": "com.wordwarrior.app",
     "productName": "单词小勇士",
+    "publish": null,
     "directories": {
       "output": "dist"
     },
