@@ -1,246 +1,482 @@
-// 全局变量
-let students = []; // 学生名单
-let availableStudents = []; // 可抽取的学生
-let words = []; // 单词列表
-let availableWords = []; // 可抽取的单词
-let selectedStudent = null; // 当前选中的学生
-let selectedWord = null; // 当前选中的单词
-let rollingInterval = null; // 滚动动画定时器
+// 全局状态
 const bgMusic = document.getElementById('bgMusic');
 
-// 页面加载时初始化
-window.addEventListener('DOMContentLoaded', () => {
-    showFileUploadPrompt();
-    // 尝试自动播放音乐
-    bgMusic.play().catch(() => {
-        // 自动播放失败，等待用户交互
-        console.log('音乐需要用户交互后播放');
-    });
+const AUDIO_DEFAULTS = Object.freeze({
+    musicEnabled: true,
+    volume: 1,
+    playMode: 'loop'
 });
 
-// 显示文件上传提示
-function showFileUploadPrompt() {
-    const promptDiv = document.createElement('div');
-    promptDiv.id = 'filePrompt';
-    promptDiv.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        border: 5px solid #ffd700;
-        box-shadow: 0 10px 50px rgba(0,0,0,0.5);
-        z-index: 3000;
-        text-align: center;
-        max-width: 600px;
-    `;
-    
-    promptDiv.innerHTML = `
-        <h3 style="color: #d32f2f; margin-bottom: 1.5rem; font-size: 1.8rem;">请上传Excel文件</h3>
-        
-        <div style="margin-bottom: 1.5rem; text-align: left; padding: 0 1rem;">
-            <label style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5rem;">1. 学生名单Excel：</label>
-            <input type="file" id="studentsFileInput" accept=".xlsx,.xls" style="width: 100%; padding: 0.5rem; border: 2px solid #ddd; border-radius: 5px;">
-            <small style="color: #666; display: block; margin-top: 0.3rem;">格式：第一列为"姓名"</small>
-        </div>
-        
-        <div style="margin-bottom: 1.5rem; text-align: left; padding: 0 1rem;">
-            <label style="display: block; color: #333; font-weight: bold; margin-bottom: 0.5rem;">2. 单词列表Excel：</label>
-            <input type="file" id="wordsFileInput" accept=".xlsx,.xls" style="width: 100%; padding: 0.5rem; border: 2px solid #ddd; border-radius: 5px;">
-            <small style="color: #666; display: block; margin-top: 0.3rem;">格式：第一列为"单词"</small>
-        </div>
-        
-        <button onclick="loadBothExcelFiles()" style="padding: 1rem 3rem; font-size: 1.3rem; background: #ff9800; color: white; border: none; border-radius: 10px; cursor: pointer; margin-right: 0.5rem; font-weight: bold;">确定</button>
-        <button onclick="useTestData()" style="padding: 1rem 3rem; font-size: 1.3rem; background: #666; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;">使用测试数据</button>
-    `;
-    
-    document.body.appendChild(promptDiv);
+const AUDIO_PLAY_MODES = Object.freeze({
+    LOOP: 'loop',
+    ONCE: 'once'
+});
+
+let students = [];
+let availableStudents = [];
+let words = [];
+let availableWords = [];
+let selectedStudent = null;
+let selectedWord = null;
+let rollingInterval = null;
+
+const audioState = {
+    musicEnabled: AUDIO_DEFAULTS.musicEnabled,
+    volume: AUDIO_DEFAULTS.volume,
+    playMode: AUDIO_DEFAULTS.playMode
+};
+
+// 工具函数
+function clamp(value, min, max) {
+    return Math.min(Math.max(Number(value), min), max);
 }
 
-// 加载两个Excel文件
-function loadBothExcelFiles() {
-    const studentsFile = document.getElementById('studentsFileInput').files[0];
-    const wordsFile = document.getElementById('wordsFileInput').files[0];
-    
-    if (!studentsFile || !wordsFile) {
-        alert('请选择学生名单和单词列表两个Excel文件！');
+function getMusicButton() {
+    return document.getElementById('musicBtn');
+}
+
+function getVolumeSlider() {
+    return document.getElementById('volumeSlider');
+}
+
+function getPlayModeSelect() {
+    return document.getElementById('playModeSelect');
+}
+
+function persistSettings(partial) {
+    if (!window.PersistenceService) {
+        console.warn('PersistenceService 不可用，无法保存设置');
         return;
     }
-    
-    // 加载学生名单
-    loadExcelFile(studentsFile, 'students', (data) => {
-        students = data;
-        availableStudents = [...students];
-        console.log('成功加载学生名单:', students);
-        
-        // 加载单词列表
-        loadExcelFile(wordsFile, 'words', (data) => {
-            words = data;
-            availableWords = [...words];
-            console.log('成功加载单词列表:', words);
-            
-            // 移除提示框
-            document.getElementById('filePrompt').remove();
-            
-            alert(`成功加载！\n学生: ${students.length} 名\n单词: ${words.length} 个`);
-        });
-    });
+    const result = window.PersistenceService.updateSettings(partial);
+    if (!result.success) {
+        console.warn('保存设置失败:', result.error);
+    }
 }
 
-// 通用Excel文件加载函数
-function loadExcelFile(file, type, callback) {
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-            
-            // 解析数据（跳过表头）
-            const result = [];
-            for (let i = 1; i < jsonData.length; i++) {
-                if (jsonData[i][0]) {
-                    result.push(jsonData[i][0].toString().trim());
+function setStudents(list) {
+    students = Array.isArray(list) ? Array.from(list) : [];
+    availableStudents = [...students];
+}
+
+function setWords(list) {
+    words = Array.isArray(list) ? Array.from(list) : [];
+    availableWords = [...words];
+}
+
+function hydrateStateFromStore() {
+    const restored = {
+        hasStudents: false,
+        hasWords: false,
+        hasSettings: false
+    };
+
+    if (!window.PersistenceService) {
+        return restored;
+    }
+
+    try {
+        const result = window.PersistenceService.getState();
+        if (result.success && result.data) {
+            const data = result.data;
+
+            setStudents(Array.isArray(data.students) ? data.students : []);
+            setWords(Array.isArray(data.words) ? data.words : []);
+
+            restored.hasStudents = students.length > 0;
+            restored.hasWords = words.length > 0;
+
+            const settings = data.settings || {};
+            audioState.musicEnabled = typeof settings.musicEnabled === 'boolean' ? settings.musicEnabled : AUDIO_DEFAULTS.musicEnabled;
+            audioState.volume = typeof settings.volume === 'number' ? clamp(settings.volume, 0, 1) : AUDIO_DEFAULTS.volume;
+            audioState.playMode = settings.playMode || AUDIO_DEFAULTS.playMode;
+            restored.hasSettings = true;
+        }
+    } catch (error) {
+        console.error('读取持久化数据失败:', error);
+    }
+
+    return restored;
+}
+
+function updateMusicButton(enabled) {
+    const musicBtn = getMusicButton();
+    if (!musicBtn) return;
+
+    musicBtn.textContent = enabled ? '🔊' : '🔇';
+    musicBtn.classList.toggle('muted', !enabled);
+}
+
+function setMusicEnabled(enabled, options = {}) {
+    const { persist = true, silent = false } = options;
+    audioState.musicEnabled = Boolean(enabled);
+
+    if (audioState.musicEnabled) {
+        bgMusic.loop = audioState.playMode === AUDIO_PLAY_MODES.LOOP;
+        bgMusic.volume = audioState.volume;
+        bgMusic.play()
+            .then(() => {
+                updateMusicButton(true);
+                if (persist) {
+                    persistSettings({ musicEnabled: true });
                 }
-            }
-            
-            if (result.length === 0) {
-                alert(`${type === 'students' ? '学生名单' : '单词列表'}Excel文件中没有找到数据！请确保第一列有内容，第一行为表头。`);
-                return;
-            }
-            
-            callback(result);
-            
-        } catch (error) {
-            console.error('解析Excel失败:', error);
-            alert(`解析${type === 'students' ? '学生名单' : '单词列表'}Excel文件失败，请确保文件格式正确！`);
+            })
+            .catch((error) => {
+                console.warn('音乐播放失败，可能需要用户交互:', error);
+                audioState.musicEnabled = false;
+                bgMusic.pause();
+                updateMusicButton(false);
+                if (persist) {
+                    persistSettings({ musicEnabled: false });
+                }
+                if (!silent && window.Feedback) {
+                    window.Feedback.showToast(
+                        '音乐播放失败，请点击任意按钮后再试',
+                        window.Feedback.TOAST_TYPES.INFO,
+                        4000
+                    );
+                }
+            });
+    } else {
+        bgMusic.pause();
+        updateMusicButton(false);
+        if (persist) {
+            persistSettings({ musicEnabled: false });
+        }
+    }
+}
+
+function updateVolume(value, options = {}) {
+    const { persist = true } = options;
+    const volume = clamp(value, 0, 1);
+    audioState.volume = volume;
+    bgMusic.volume = volume;
+
+    const slider = getVolumeSlider();
+    if (slider) {
+        slider.value = volume;
+    }
+
+    if (persist) {
+        persistSettings({ volume });
+    }
+}
+
+function updatePlayMode(mode, options = {}) {
+    const { persist = true } = options;
+    const values = Object.values(AUDIO_PLAY_MODES);
+    const nextMode = values.includes(mode) ? mode : AUDIO_DEFAULTS.playMode;
+
+    audioState.playMode = nextMode;
+    bgMusic.loop = nextMode === AUDIO_PLAY_MODES.LOOP;
+
+    const select = getPlayModeSelect();
+    if (select) {
+        select.value = nextMode;
+    }
+
+    if (persist) {
+        persistSettings({ playMode: nextMode });
+    }
+}
+
+function bindAudioControls() {
+    const slider = getVolumeSlider();
+    if (slider) {
+        slider.addEventListener('input', (event) => {
+            updateVolume(event.target.value);
+        });
+    }
+
+    const select = getPlayModeSelect();
+    if (select) {
+        select.addEventListener('change', (event) => {
+            updatePlayMode(event.target.value);
+        });
+    }
+}
+
+function initializeAudio() {
+    updateVolume(audioState.volume, { persist: false });
+    updatePlayMode(audioState.playMode, { persist: false });
+    updateMusicButton(audioState.musicEnabled);
+
+    if (audioState.musicEnabled) {
+        setMusicEnabled(true, { persist: false, silent: true });
+    } else {
+        bgMusic.pause();
+    }
+}
+
+function showFileUploadPrompt() {
+    if (document.getElementById('filePrompt')) {
+        return;
+    }
+
+    const promptDiv = document.createElement('div');
+    promptDiv.id = 'filePrompt';
+    promptDiv.className = 'file-upload-prompt';
+    promptDiv.innerHTML = `
+        <h3 class="prompt-title">请上传 Excel 文件</h3>
+        <p class="prompt-subtitle">成功导入后会自动保存，重启应用仍可继续使用</p>
+        <div class="prompt-field">
+            <label>1. 学生名单 Excel：</label>
+            <input type="file" id="studentsFileInput" accept=".xlsx,.xls">
+            <small>格式：第一列为“姓名”，第一行为表头</small>
+        </div>
+        <div class="prompt-field">
+            <label>2. 单词列表 Excel：</label>
+            <input type="file" id="wordsFileInput" accept=".xlsx,.xls">
+            <small>格式：第一列为“单词”，第一行为表头</small>
+        </div>
+        <div class="prompt-actions">
+            <button id="loadExcelBtn" class="btn-primary">确定</button>
+            <button id="useTestDataBtn" class="btn-secondary">使用测试数据</button>
+        </div>
+    `;
+
+    document.body.appendChild(promptDiv);
+
+    document.getElementById('loadExcelBtn').addEventListener('click', loadBothExcelFiles);
+    document.getElementById('useTestDataBtn').addEventListener('click', useTestData);
+}
+
+async function loadBothExcelFiles() {
+    const loadButton = document.getElementById('loadExcelBtn');
+    if (loadButton) {
+        loadButton.disabled = true;
+        loadButton.classList.add('loading');
+        loadButton.textContent = '导入中...';
+    }
+
+    const studentsFile = document.getElementById('studentsFileInput')?.files[0];
+    const wordsFile = document.getElementById('wordsFileInput')?.files[0];
+
+    const resetButtonState = () => {
+        if (loadButton) {
+            loadButton.disabled = false;
+            loadButton.classList.remove('loading');
+            loadButton.textContent = '确定';
         }
     };
-    
-    reader.onerror = function() {
-        alert('读取文件失败！');
-    };
-    
-    reader.readAsArrayBuffer(file);
+
+    if (!studentsFile || !wordsFile) {
+        resetButtonState();
+        if (window.Feedback) {
+            window.Feedback.showError('请同时选择学生名单和单词列表两个 Excel 文件');
+        } else {
+            alert('请选择学生名单和单词列表两个 Excel 文件！');
+        }
+        return;
+    }
+
+    if (!window.DataImporter) {
+        resetButtonState();
+        const message = '数据导入模块未加载，请重试';
+        if (window.Feedback) {
+            window.Feedback.showError(message);
+        } else {
+            alert(message);
+        }
+        return;
+    }
+
+    try {
+        const results = await window.DataImporter.importBothFiles(studentsFile, wordsFile);
+
+        if (results.success) {
+            if (results.students?.success) {
+                setStudents(results.students.data);
+            }
+            if (results.words?.success) {
+                setWords(results.words.data);
+            }
+
+            const prompt = document.getElementById('filePrompt');
+            if (prompt) {
+                prompt.remove();
+            }
+
+            if (window.Feedback) {
+                window.Feedback.showSuccess(
+                    `✅ 数据已自动保存！\n学生: ${students.length} 名\n单词: ${words.length} 个`
+                );
+            } else {
+                alert(`成功加载并保存！\n学生: ${students.length} 名\n单词: ${words.length} 个`);
+            }
+
+            console.log('成功导入并保存数据:', {
+                students: students.length,
+                words: words.length
+            });
+        } else {
+            const errorMsg = results.errors?.length ? results.errors.join('\n') : '导入失败';
+            if (window.Feedback) {
+                window.Feedback.showError(`❌ 导入失败：\n${errorMsg}`);
+            } else {
+                alert(`导入失败：\n${errorMsg}`);
+            }
+        }
+    } catch (error) {
+        console.error('导入异常:', error);
+        if (window.Feedback) {
+            window.Feedback.showError(`❌ 导入异常：${error.message}`);
+        } else {
+            alert(`导入异常：${error.message}`);
+        }
+    } finally {
+        resetButtonState();
+    }
 }
 
-// 使用测试数据
-function useTestData() {
-    students = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十'];
-    availableStudents = [...students];
-    
-    words = ['apple', 'banana', 'cat', 'dog', 'elephant', 'fish', 'grape', 'house', 'ice', 'juice'];
-    availableWords = [...words];
-    
-    // 移除提示框
-    document.getElementById('filePrompt').remove();
-    
-    console.log('使用测试数据 - 学生:', students);
-    console.log('使用测试数据 - 单词:', words);
-    alert('已加载测试数据\n学生: 8名\n单词: 10个');
+async function useTestData() {
+    const testStudents = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十'];
+    const testWords = ['apple', 'banana', 'cat', 'dog', 'elephant', 'fish', 'grape', 'house', 'ice', 'juice'];
+
+    if (!window.DataImporter) {
+        setStudents(testStudents);
+        setWords(testWords);
+        const prompt = document.getElementById('filePrompt');
+        if (prompt) {
+            prompt.remove();
+        }
+        alert('已加载测试数据\n学生: 8名\n单词: 10个');
+        return;
+    }
+
+    try {
+        const [studentsResult, wordsResult] = await Promise.all([
+            window.DataImporter.importTestData(testStudents, window.DataImporter.DATA_TYPES.STUDENTS),
+            window.DataImporter.importTestData(testWords, window.DataImporter.DATA_TYPES.WORDS)
+        ]);
+
+        if (studentsResult.success && wordsResult.success) {
+            setStudents(testStudents);
+            setWords(testWords);
+
+            const prompt = document.getElementById('filePrompt');
+            if (prompt) {
+                prompt.remove();
+            }
+
+            if (window.Feedback) {
+                window.Feedback.showSuccess('✅ 测试数据已自动保存！\n学生: 8名\n单词: 10个');
+            } else {
+                alert('已加载测试数据并保存\n学生: 8名\n单词: 10个');
+            }
+
+            console.log('成功导入测试数据');
+        } else {
+            throw new Error('保存测试数据失败');
+        }
+    } catch (error) {
+        console.error('导入测试数据异常:', error);
+        if (window.Feedback) {
+            window.Feedback.showError(`❌ 导入测试数据失败：${error.message}`);
+        } else {
+            alert(`导入测试数据失败：${error.message}`);
+        }
+    }
 }
 
-// 切换屏幕
 function switchScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(screen => {
+    document.querySelectorAll('.screen').forEach((screen) => {
         screen.classList.remove('active');
     });
     document.getElementById(screenId).classList.add('active');
 }
 
-// 开始抽取
 function startDrawing() {
     if (availableStudents.length === 0) {
-        alert('所有学生都已被抽取！');
+        if (window.Feedback) {
+            window.Feedback.showError('所有学生都已被抽取，已无可抽取的学生');
+        } else {
+            alert('所有学生都已被抽取！');
+        }
         return;
     }
-    
-    // 切换到抽取中页面
+
     switchScreen('drawingScreen');
-    
-    // 开始滚动动画
+
     const rollingNameEl = document.getElementById('rollingName');
     let currentIndex = 0;
-    
+
     rollingInterval = setInterval(() => {
         currentIndex = Math.floor(Math.random() * availableStudents.length);
         rollingNameEl.textContent = availableStudents[currentIndex];
     }, 100);
-    
-    // 2秒后停止并显示结果
+
     setTimeout(() => {
         clearInterval(rollingInterval);
-        
-        // 随机选择一个学生
+
         const randomIndex = Math.floor(Math.random() * availableStudents.length);
         selectedStudent = availableStudents[randomIndex];
-        
-        // 从可抽取列表中移除
         availableStudents.splice(randomIndex, 1);
-        
-        // 显示结果
+
         document.getElementById('selectedName').textContent = selectedStudent;
         switchScreen('resultScreen');
     }, 2000);
 }
 
-// 抽取单词
 function showWordInput() {
     if (availableWords.length === 0) {
-        alert('所有单词都已被抽取！');
+        if (window.Feedback) {
+            window.Feedback.showError('所有单词都已被抽取，已无可抽取的单词');
+        } else {
+            alert('所有单词都已被抽取！');
+        }
         return;
     }
-    
-    // 随机抽取一个单词
+
     const randomIndex = Math.floor(Math.random() * availableWords.length);
     selectedWord = availableWords[randomIndex];
-    
-    // 从可抽取列表中移除
     availableWords.splice(randomIndex, 1);
-    
-    // 显示单词
+
     displayWord(selectedWord);
 }
 
-// 显示单词
 function displayWord(word) {
     const wordGrid = document.getElementById('wordGrid');
     wordGrid.innerHTML = '';
-    
+
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item';
     wordItem.textContent = word;
     wordGrid.appendChild(wordItem);
-    
+
     switchScreen('wordScreen');
 }
 
-// 重置到开始页面
 function resetToStart() {
     switchScreen('startScreen');
     selectedStudent = null;
     selectedWord = null;
 }
 
-// 音乐控制
 function toggleMusic() {
-    const musicBtn = document.getElementById('musicBtn');
-    
-    if (bgMusic.paused) {
-        bgMusic.play();
-        musicBtn.textContent = '🔊';
-        musicBtn.classList.remove('muted');
-    } else {
-        bgMusic.pause();
-        musicBtn.textContent = '🔇';
-        musicBtn.classList.add('muted');
+    setMusicEnabled(!audioState.musicEnabled);
+}
+
+function initializeApp() {
+    const restored = hydrateStateFromStore();
+    bindAudioControls();
+    initializeAudio();
+
+    if (!students.length || !words.length) {
+        showFileUploadPrompt();
+    } else if (window.Feedback && (restored.hasStudents || restored.hasWords)) {
+        window.Feedback.showSuccess(
+            `✅ 已恢复上次导入的数据：学生 ${students.length} 名 / 单词 ${words.length} 个`
+        );
     }
 }
 
+// 初始化入口
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+});
+
+// 暴露全局函数
 Object.assign(window, {
     startDrawing,
     showWordInput,
@@ -249,4 +485,3 @@ Object.assign(window, {
     loadBothExcelFiles,
     useTestData
 });
-

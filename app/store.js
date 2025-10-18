@@ -7,13 +7,30 @@ const DEFAULT_STATE = {
     musicEnabled: true,
     animationDuration: 2000,
     lastUpdated: null,
-    volume: 1
+    volume: 1,
+    playMode: 'loop'
   },
   sessionHistory: [],
   metadata: {
     lastModified: null,
     version: '1.0.0',
     schemaVersion: 1
+  },
+  importMetadata: {
+    students: {
+      filename: null,
+      filepath: null,
+      importedAt: null,
+      sourceType: null,
+      count: 0
+    },
+    words: {
+      filename: null,
+      filepath: null,
+      importedAt: null,
+      sourceType: null,
+      count: 0
+    }
   }
 };
 
@@ -54,6 +71,10 @@ const schema = {
         minimum: 0,
         maximum: 1,
         default: 1
+      },
+      playMode: {
+        type: 'string',
+        default: 'loop'
       }
     },
     additionalProperties: false
@@ -102,6 +123,67 @@ const schema = {
       }
     },
     additionalProperties: true
+  },
+  importMetadata: {
+    type: 'object',
+    default: DEFAULT_STATE.importMetadata,
+    properties: {
+      students: {
+        type: 'object',
+        default: DEFAULT_STATE.importMetadata.students,
+        properties: {
+          filename: {
+            type: ['string', 'null'],
+            default: null
+          },
+          filepath: {
+            type: ['string', 'null'],
+            default: null
+          },
+          importedAt: {
+            type: ['string', 'null'],
+            default: null
+          },
+          sourceType: {
+            type: ['string', 'null'],
+            default: null
+          },
+          count: {
+            type: 'number',
+            default: 0
+          }
+        },
+        additionalProperties: false
+      },
+      words: {
+        type: 'object',
+        default: DEFAULT_STATE.importMetadata.words,
+        properties: {
+          filename: {
+            type: ['string', 'null'],
+            default: null
+          },
+          filepath: {
+            type: ['string', 'null'],
+            default: null
+          },
+          importedAt: {
+            type: ['string', 'null'],
+            default: null
+          },
+          sourceType: {
+            type: ['string', 'null'],
+            default: null
+          },
+          count: {
+            type: 'number',
+            default: 0
+          }
+        },
+        additionalProperties: false
+      }
+    },
+    additionalProperties: false
   }
 };
 
@@ -183,7 +265,8 @@ function getState() {
       words: store.get('words', getDefaultValue('words')),
       settings: store.get('settings', getDefaultValue('settings')),
       sessionHistory: store.get('sessionHistory', getDefaultValue('sessionHistory')),
-      metadata: store.get('metadata', getDefaultValue('metadata'))
+      metadata: store.get('metadata', getDefaultValue('metadata')),
+      importMetadata: store.get('importMetadata', getDefaultValue('importMetadata'))
     })
   );
 }
@@ -294,7 +377,12 @@ function updateSettings(newSettings) {
       }
 
       const currentSettings = store.get('settings', getDefaultValue('settings'));
-      store.set('settings', { ...currentSettings, ...newSettings });
+      const nextSettings = {
+        ...currentSettings,
+        ...newSettings,
+        lastUpdated: new Date().toISOString()
+      };
+      store.set('settings', nextSettings);
       touchMetadata();
       return { success: true };
     }

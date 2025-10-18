@@ -27,6 +27,7 @@
       "index.html",
       "style.css",
       "renderer.js",
+      "renderer/**/*",
       "script.js",
       "main.js",
       "preload.js",

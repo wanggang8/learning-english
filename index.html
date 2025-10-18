@@ -51,6 +51,22 @@
             </div>
         </div>
 
+        <!-- 音频设置面板 -->
+        <div class="audio-settings-panel">
+            <h4>音乐设置</h4>
+            <div class="audio-setting-row">
+                <label for="volumeSlider">音量</label>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+            </div>
+            <div class="audio-setting-row">
+                <label for="playModeSelect">播放模式</label>
+                <select id="playModeSelect">
+                    <option value="loop">循环播放</option>
+                    <option value="once">播放一次</option>
+                </select>
+            </div>
+        </div>
+
         <!-- 音乐控制按钮 -->
         <button class="music-toggle" onclick="toggleMusic()" id="musicBtn">🔊</button>
     </div>
