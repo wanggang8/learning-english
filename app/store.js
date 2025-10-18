@@ -3,12 +3,14 @@ const Store = require('electron-store');
 const DEFAULT_STATE = {
   students: [],
   words: [],
+  studentStats: {},
   settings: {
     musicEnabled: true,
     animationDuration: 2000,
     lastUpdated: null,
     volume: 1,
-    playMode: 'loop'
+    playMode: 'loop',
+    drawMode: 'random'
   },
   // 会话历史：区分活动会话与归档会话
   sessionHistory: {
@@ -57,6 +59,19 @@ const schema = {
       type: 'string'
     }
   },
+  studentStats: {
+    type: 'object',
+    default: {},
+    additionalProperties: {
+      type: 'object',
+      properties: {
+        drawCount: { type: 'number', default: 0 },
+        lastDrawnAt: { type: ['string', 'null'], default: null },
+        lastDrawMode: { type: ['string', 'null'], default: null }
+      },
+      additionalProperties: true
+    }
+  },
   settings: {
     type: 'object',
     default: DEFAULT_STATE.settings,
@@ -83,6 +98,10 @@ const schema = {
       playMode: {
         type: 'string',
         default: 'loop'
+      },
+      drawMode: {
+        type: 'string',
+        default: 'random'
       }
     },
     additionalProperties: false
@@ -394,6 +413,7 @@ function getState() {
     () => ({
       students: store.get('students', getDefaultValue('students')),
       words: store.get('words', getDefaultValue('words')),
+      studentStats: store.get('studentStats', getDefaultValue('studentStats')),
       settings: store.get('settings', getDefaultValue('settings')),
       sessionHistory: store.get('sessionHistory', getDefaultValue('sessionHistory')),
       metadata: store.get('metadata', getDefaultValue('metadata')),

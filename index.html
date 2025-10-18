@@ -40,6 +40,7 @@
             <div id="resultScreen" class="screen">
                 <h2 class="subtitle">🎉 恭喜！幸运小勇士是</h2>
                 <div class="name-display result" id="selectedName"></div>
+                <div class="status-row">当前抽取模式：<span id="modeIndicator">--</span></div>
                 <button class="btn-secondary" onclick="showWordInput()">抽取单词</button>
             </div>
 
@@ -51,7 +52,7 @@
             </div>
         </div>
 
-        <!-- 音频设置面板 -->
+        <!-- 设置面板 -->
         <div class="audio-settings-panel">
             <h4>音乐设置</h4>
             <div class="audio-setting-row">
@@ -63,6 +64,15 @@
                 <select id="playModeSelect">
                     <option value="loop">循环播放</option>
                     <option value="once">播放一次</option>
+                </select>
+            </div>
+            <hr>
+            <h4>抽取模式</h4>
+            <div class="audio-setting-row">
+                <label for="drawModeSelect">抽取模式</label>
+                <select id="drawModeSelect">
+                    <option value="random">完全随机</option>
+                    <option value="fair">公平模式</option>
                 </select>
             </div>
             <hr>
