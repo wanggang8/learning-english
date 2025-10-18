@@ -101,6 +101,14 @@ function addSessionHistory(entry) {
   return execute('addSessionHistory', (api) => api.addSessionHistory(entry));
 }
 
+function startNewSession() {
+  return execute('startNewSession', (api) => api.startNewSession());
+}
+
+function clearHistory(options = { scope: 'current' }) {
+  return execute('clearHistory', (api) => api.clearHistory(options));
+}
+
 function getSettings() {
   return execute('getSettings', (api) => {
     const settings = api.getSettings();
@@ -147,6 +155,8 @@ window.PersistenceService = Object.freeze({
   updatePartial,
   clearSession,
   addSessionHistory,
+  startNewSession,
+  clearHistory,
   getSettings,
   updateSettings,
   saveData,

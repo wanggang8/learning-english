@@ -433,6 +433,8 @@ function showWordInput() {
     availableWords.splice(randomIndex, 1);
 
     displayWord(selectedWord);
+    // 记录并持久化本次抽取
+    persistCurrentDrawEvent();
 }
 
 function displayWord(word) {
@@ -447,6 +449,33 @@ function displayWord(word) {
     switchScreen('wordScreen');
 }
 
+// 公平模式指标快照（目前为均匀随机）
+function createFairnessSnapshot() {
+    return {
+        mode: 'uniform',
+        remainingStudents: Array.isArray(availableStudents) ? availableStudents.length : 0,
+        remainingWords: Array.isArray(availableWords) ? availableWords.length : 0
+    };
+}
+
+// 持久化当前抽取事件
+function persistCurrentDrawEvent() {
+    if (!window.PersistenceService) return;
+    try {
+        const entry = {
+            student: selectedStudent || null,
+            word: selectedWord || null,
+            fairness: createFairnessSnapshot()
+        };
+        const result = window.PersistenceService.addSessionHistory(entry);
+        if (!result.success) {
+            console.warn('保存抽取历史失败:', result.error);
+        }
+    } catch (e) {
+        console.warn('保存抽取历史异常:', e);
+    }
+}
+
 function resetToStart() {
     switchScreen('startScreen');
     selectedStudent = null;
@@ -455,6 +484,63 @@ function resetToStart() {
 
 function toggleMusic() {
     setMusicEnabled(!audioState.musicEnabled);
+}
+
+// 清空历史确认弹窗
+function showClearHistoryDialog() {
+    if (document.getElementById('clearHistoryModal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'clearHistoryModal';
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>清空历史</h3>
+            <p>请选择清空范围：</p>
+            <div class="modal-buttons">
+                <button id="clearCurrentSessionBtn" class="btn-secondary">清空当前会话</button>
+                <button id="clearAllHistoryBtn" class="btn-back">清空全部历史</button>
+                <button id="cancelClearHistoryBtn" class="btn-primary">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const cleanup = () => {
+        modal.remove();
+    };
+
+    document.getElementById('clearCurrentSessionBtn')?.addEventListener('click', () => {
+        try {
+            const result = window.PersistenceService?.clearHistory({ scope: 'current' });
+            if (result && result.success) {
+                window.Feedback?.showSuccess('已清空当前会话历史');
+            } else if (result && !result.success) {
+                window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
+            }
+        } catch (e) {
+            window.Feedback?.showError(`清空失败：${e.message}`);
+        } finally {
+            cleanup();
+        }
+    });
+
+    document.getElementById('clearAllHistoryBtn')?.addEventListener('click', () => {
+        try {
+            const result = window.PersistenceService?.clearHistory({ scope: 'all' });
+            if (result && result.success) {
+                window.Feedback?.showSuccess('已清空全部历史');
+            } else if (result && !result.success) {
+                window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
+            }
+        } catch (e) {
+            window.Feedback?.showError(`清空失败：${e.message}`);
+        } finally {
+            cleanup();
+        }
+    });
+
+    document.getElementById('cancelClearHistoryBtn')?.addEventListener('click', cleanup);
 }
 
 function prepareForReimport() {
@@ -468,9 +554,17 @@ function prepareForReimport() {
     }
 }
 
+function bindHistoryControls() {
+    const btn = document.getElementById('clearHistoryBtn');
+    if (btn) {
+        btn.addEventListener('click', showClearHistoryDialog);
+    }
+}
+
 function initializeApp() {
     const restored = hydrateStateFromStore();
     bindAudioControls();
+    bindHistoryControls();
     initializeAudio();
 
     if (!students.length || !words.length) {
@@ -492,5 +586,6 @@ Object.assign(window, {
     loadBothExcelFiles,
     useTestData,
     showFileUploadPrompt,
-    prepareForReimport
+    prepareForReimport,
+    showClearHistoryDialog
 });
