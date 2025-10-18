@@ -241,3 +241,12 @@ function toggleMusic() {
     }
 }
 
+Object.assign(window, {
+    startDrawing,
+    showWordInput,
+    resetToStart,
+    toggleMusic,
+    loadBothExcelFiles,
+    useTestData
+});
+
