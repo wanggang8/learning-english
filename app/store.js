@@ -10,11 +10,19 @@ const DEFAULT_STATE = {
     volume: 1,
     playMode: 'loop'
   },
-  sessionHistory: [],
+  // 会话历史：区分活动会话与归档会话
+  sessionHistory: {
+    activeSession: {
+      id: null,
+      startedAt: null,
+      events: []
+    },
+    archivedSessions: []
+  },
   metadata: {
     lastModified: null,
-    version: '1.0.0',
-    schemaVersion: 1
+    version: '1.1.4',
+    schemaVersion: 2
   },
   importMetadata: {
     students: {
@@ -80,30 +88,85 @@ const schema = {
     additionalProperties: false
   },
   sessionHistory: {
-    type: 'array',
-    default: [],
-    items: {
-      type: 'object',
-      properties: {
-        timestamp: {
-          type: 'string'
+    type: 'object',
+    default: DEFAULT_STATE.sessionHistory,
+    properties: {
+      activeSession: {
+        type: 'object',
+        default: DEFAULT_STATE.sessionHistory.activeSession,
+        properties: {
+          id: { type: ['string', 'null'], default: null },
+          startedAt: { type: ['string', 'null'], default: null },
+          events: {
+            type: 'array',
+            default: [],
+            items: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string' },
+                student: { type: ['string', 'null'], default: null },
+                word: { type: ['string', 'null'], default: null },
+                fairness: {
+                  type: ['object', 'null'],
+                  default: null,
+                  properties: {
+                    mode: { type: 'string' },
+                    remainingStudents: { type: 'number' },
+                    remainingWords: { type: 'number' }
+                  },
+                  additionalProperties: true
+                },
+                payload: { type: ['object', 'null'], default: null }
+              },
+              required: ['timestamp'],
+              additionalProperties: true
+            }
+          }
         },
-        student: {
-          type: ['string', 'null'],
-          default: null
-        },
-        word: {
-          type: ['string', 'null'],
-          default: null
-        },
-        payload: {
-          type: ['object', 'null'],
-          default: null
-        }
+        additionalProperties: true
       },
-      required: ['timestamp'],
-      additionalProperties: true
-    }
+      archivedSessions: {
+        type: 'array',
+        default: [],
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            startedAt: { type: 'string' },
+            endedAt: { type: ['string', 'null'], default: null },
+            events: {
+              type: 'array',
+              default: [],
+              items: {
+                type: 'object',
+                properties: {
+                  timestamp: { type: 'string' },
+                  student: { type: ['string', 'null'], default: null },
+                  word: { type: ['string', 'null'], default: null },
+                  fairness: {
+                    type: ['object', 'null'],
+                    default: null,
+                    properties: {
+                      mode: { type: 'string' },
+                      remainingStudents: { type: 'number' },
+                      remainingWords: { type: 'number' }
+                    },
+                    additionalProperties: true
+                  },
+                  payload: { type: ['object', 'null'], default: null }
+                },
+                required: ['timestamp'],
+                additionalProperties: true
+              }
+            },
+            summary: { type: ['object', 'null'], default: null }
+          },
+          required: ['id', 'startedAt'],
+          additionalProperties: true
+        }
+      }
+    },
+    additionalProperties: false
   },
   metadata: {
     type: 'object',
@@ -244,6 +307,74 @@ function createStore() {
 
 const store = createStore();
 
+// 会话缓存与辅助方法
+const MAX_EVENTS_PER_SESSION = 100;
+let sessionCache = null;
+
+function createSessionId() {
+  return `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createNewActiveSession() {
+  return {
+    id: createSessionId(),
+    startedAt: new Date().toISOString(),
+    events: []
+  };
+}
+
+function ensureSessionCache() {
+  if (!sessionCache) {
+    let history = store.get('sessionHistory', getDefaultValue('sessionHistory'));
+    if (!history || typeof history !== 'object') {
+      history = clone(DEFAULT_STATE.sessionHistory);
+    }
+    if (!history.activeSession || !Array.isArray(history.activeSession.events)) {
+      history.activeSession = createNewActiveSession();
+    } else {
+      if (!history.activeSession.id || !history.activeSession.startedAt) {
+        history.activeSession.id = history.activeSession.id || createSessionId();
+        history.activeSession.startedAt = history.activeSession.startedAt || new Date().toISOString();
+      }
+    }
+    if (!Array.isArray(history.archivedSessions)) {
+      history.archivedSessions = [];
+    }
+    sessionCache = history;
+    // 同步到持久化，确保结构正确
+    store.set('sessionHistory', sessionCache);
+  }
+  return sessionCache;
+}
+
+function flushSessionCache() {
+  if (sessionCache) {
+    store.set('sessionHistory', sessionCache);
+    touchMetadata();
+  }
+}
+
+function archiveActiveSessionInternal() {
+  const cache = ensureSessionCache();
+  const active = cache.activeSession;
+  if (!active || !Array.isArray(active.events) || active.events.length === 0) {
+    // 无事件则直接创建新的活动会话
+    cache.activeSession = createNewActiveSession();
+    flushSessionCache();
+    return;
+  }
+  const endedAt = new Date().toISOString();
+  cache.archivedSessions.push({
+    id: active.id || createSessionId(),
+    startedAt: active.startedAt || endedAt,
+    endedAt,
+    events: active.events,
+    summary: { count: Array.isArray(active.events) ? active.events.length : 0 }
+  });
+  cache.activeSession = createNewActiveSession();
+  flushSessionCache();
+}
+
 function runWithFallback(operation, fallback, executor) {
   try {
     return executor();
@@ -322,6 +453,41 @@ function updatePartial(updates) {
   );
 }
 
+// 归档当前会话并启动新会话，同时清空学生和单词数据
+function startNewSession() {
+  return runWithFallback(
+    'startNewSession',
+    (error) => ({ success: false, error: error.message }),
+    () => {
+      archiveActiveSessionInternal();
+      store.set('students', getDefaultValue('students'));
+      store.set('words', getDefaultValue('words'));
+      touchMetadata();
+      return { success: true };
+    }
+  );
+}
+
+// 清空历史：支持清空当前会话或全部历史
+function clearHistory(options = {}) {
+  return runWithFallback(
+    'clearHistory',
+    (error) => ({ success: false, error: error.message }),
+    () => {
+      const scope = options.scope === 'all' ? 'all' : 'current';
+      const cache = ensureSessionCache();
+      if (scope === 'all') {
+        cache.archivedSessions = [];
+        cache.activeSession = createNewActiveSession();
+      } else {
+        cache.activeSession.events = [];
+      }
+      flushSessionCache();
+      return { success: true };
+    }
+  );
+}
+
 function clearSession() {
   return runWithFallback(
     'clearSession',
@@ -341,19 +507,21 @@ function addSessionHistory(entry) {
     'addSessionHistory',
     (error) => ({ success: false, error: error.message }),
     () => {
-      const history = store.get('sessionHistory', getDefaultValue('sessionHistory'));
+      const cache = ensureSessionCache();
       const newEntry = {
         timestamp: new Date().toISOString(),
-        ...entry
+        student: entry && Object.prototype.hasOwnProperty.call(entry, 'student') ? entry.student : null,
+        word: entry && Object.prototype.hasOwnProperty.call(entry, 'word') ? entry.word : null,
+        fairness: entry && Object.prototype.hasOwnProperty.call(entry, 'fairness') ? entry.fairness : null,
+        payload: entry && Object.prototype.hasOwnProperty.call(entry, 'payload') ? entry.payload : null
       };
-      history.push(newEntry);
+      cache.activeSession.events.push(newEntry);
 
-      if (history.length > 100) {
-        history.splice(0, history.length - 100);
+      if (Array.isArray(cache.activeSession.events) && cache.activeSession.events.length > MAX_EVENTS_PER_SESSION) {
+        cache.activeSession.events.splice(0, cache.activeSession.events.length - MAX_EVENTS_PER_SESSION);
       }
 
-      store.set('sessionHistory', history);
-      touchMetadata();
+      flushSessionCache();
       return { success: true };
     }
   );
@@ -401,8 +569,12 @@ module.exports = {
   getState,
   setState,
   updatePartial,
+  // 会话管理
+  startNewSession,
+  clearHistory,
   clearSession,
   addSessionHistory,
+  // 设置
   getSettings,
   updateSettings
 };

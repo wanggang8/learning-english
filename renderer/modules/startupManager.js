@@ -83,16 +83,16 @@ function createDialog({ title, description, stats, onRestore, onReimport, onNewS
 
   modal.innerHTML = `
     <div class="modal-content startup-dialog">
-      <h3 class="startup-title">${title || '恢复上次会话'}</h3>
+      <h3 class="startup-title">${title || '继续上次会话'}</h3>
       ${description ? `<p class="startup-desc">${description}</p>` : ''}
       <div class="startup-stats">
         <div class="startup-stat-item">👥 学生：<strong>${studentsText}</strong>${studentsMeta?.filename ? `（${studentsMeta.filename}）` : ''}</div>
         <div class="startup-stat-item">📚 单词：<strong>${wordsText}</strong>${wordsMeta?.filename ? `（${wordsMeta.filename}）` : ''}</div>
       </div>
       <div class="modal-buttons startup-actions">
-        ${showRestore ? '<button id="startupRestoreBtn" class="btn-primary">恢复</button>' : ''}
+        ${showRestore ? '<button id="startupRestoreBtn" class="btn-primary">继续会话</button>' : ''}
         <button id="startupReimportBtn" class="btn-secondary">重新导入</button>
-        <button id="startupNewSessionBtn" class="btn-back">开始新会话</button>
+        <button id="startupNewSessionBtn" class="btn-back">新建会话</button>
       </div>
     </div>
   `;
@@ -159,7 +159,7 @@ function runStartupFlow() {
       // 依然给用户一个选择是否清空旧数据的入口
       createDialog({
         title: '历史数据异常',
-        description: '检测到历史数据不完整或损坏，建议重新导入。你也可以开始新的会话（将清空历史会话数据）。',
+        description: '检测到历史数据不完整或损坏，建议重新导入。你也可以新建会话（将自动归档旧会话数据）。',
         stats: { students: info.counts.students, words: info.counts.words, meta: info.importMetadata },
         showRestore: false,
         onReimport: () => {
@@ -167,9 +167,9 @@ function runStartupFlow() {
           window.Feedback?.showSuccess('已进入重新导入模式');
         },
         onNewSession: () => {
-          try { window.PersistenceService?.clearSession(); } catch (e) {}
+          try { window.PersistenceService?.startNewSession(); } catch (e) {}
           window.prepareForReimport?.();
-          window.Feedback?.showToast('已开始新的会话，请导入数据', window.Feedback.TOAST_TYPES.INFO, 4000);
+          window.Feedback?.showToast('已新建会话，请导入数据', window.Feedback.TOAST_TYPES.INFO, 4000);
         }
       });
       return;
@@ -177,8 +177,8 @@ function runStartupFlow() {
 
     // 正常情况：展示恢复对话框
     createDialog({
-      title: '恢复上次数据？',
-      description: '检测到上次导入的数据，是否要恢复继续使用？',
+      title: '继续使用上次数据？',
+      description: '检测到上次导入的数据，是否要继续会话或新建会话？',
       stats: { students: info.counts.students, words: info.counts.words, meta: info.importMetadata },
       onRestore: () => {
         // 默认初始化过程已经加载过数据，此处仅提示
@@ -191,9 +191,9 @@ function runStartupFlow() {
         window.Feedback?.showToast('请重新导入学生与单词数据', window.Feedback.TOAST_TYPES.INFO, 4000);
       },
       onNewSession: () => {
-        try { window.PersistenceService?.clearSession(); } catch (e) {}
+        try { window.PersistenceService?.startNewSession(); } catch (e) {}
         window.prepareForReimport?.();
-        window.Feedback?.showToast('已开始新的会话，请导入数据', window.Feedback.TOAST_TYPES.INFO, 4000);
+        window.Feedback?.showToast('已新建会话，请导入数据', window.Feedback.TOAST_TYPES.INFO, 4000);
       }
     });
   }, 0); // 让出事件循环，避免阻塞
