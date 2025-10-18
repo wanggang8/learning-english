@@ -15,16 +15,23 @@
 ## 文件结构
 
 ```
-personal-website/
+word-warrior/
+├── main.js             # Electron 主进程入口
+├── preload.js          # 预加载脚本，向渲染进程暴露持久化 API
+├── renderer.js         # 渲染进程入口模块
 ├── index.html          # 主页面
 ├── style.css           # 样式文件
-├── script.js           # 逻辑脚本
-├── data/               # Excel数据文件夹
+├── script.js           # 页面逻辑（由 renderer.js 加载）
+├── app/
+│   └── store.js        # electron-store 包装与数据 Schema
+├── services/
+│   └── persistence.js  # 渲染层持久化服务封装
+├── data/               # Excel 数据文件夹
 │   ├── 二一班.xlsx
 │   ├── 二二班.xlsx
 │   └── ...
-├── assets/             # 资源文件夹
-│   └── music.mp3       # 背景音乐（需自行添加）
+├── assets/             # 资源文件夹（图片、音乐、依赖库）
+├── package.json        # 项目依赖与构建配置
 └── README.md           # 说明文档
 ```
 
@@ -122,6 +129,132 @@ setTimeout(() => {
 - CSS3（动画、渐变、响应式）
 - JavaScript（ES6+）
 - SheetJS（xlsx.js）- Excel文件解析
+- Electron + electron-store（持久化存储）
+
+## Electron 桌面应用打包
+
+项目使用 [electron-builder](https://www.electron.build/) 进行跨平台打包，支持 macOS DMG 与 Windows NSIS 安装包。
+
+### 离线依赖
+
+- 所有依赖（包括 `electron-store`）均已锁定在 `package-lock.json` 中。
+- 在无网络环境下可使用 `npm ci --offline`（需提前准备好 npm 缓存）或自建离线 npm 仓库进行安装。
+- 需要的静态数据文件位于 `data/` 目录，打包时会一并包含。
+
+### 打包与发布
+
+```bash
+# 开发调试
+npm start
+
+# 全量打包（mac + win）
+npm run build:all
+
+# macOS 单独打包    npm run build:mac
+# Windows 单独打包    npm run build:win
+```
+
+## 数据与持久化
+
+- `data/` 目录用于存放 Excel 数据源（学生名单、单词列表）。
+- Electron 进程通过 `electron-store` 在本地持久化存储以下数据结构：
+  - `students`：学生列表
+  - `words`：单词列表
+  - `settings`：应用设置（音乐开关、动画时长等）
+  - `sessionHistory`：历史抽取记录
+  - `metadata`：版本与修改时间信息
+- 预加载脚本（`preload.js`）通过 `contextBridge` 向渲染进程暴露 `window.store` API，渲染层可以通过 `services/persistence.js` 统一访问并处理错误。
+- 可通过 `window.PersistenceService.setErrorHandler(fn)` 注册统一错误提示钩子。
+
+## 手动测试清单
+
+### 基础测试
+
+1. **启动应用**
+   ```bash
+   npm start
+   ```
+   - 确认主界面正常加载
+   - 背景音乐可播放/暂停
+   - 开发者工具（F12）无 JavaScript 错误
+
+2. **持久化 API 可用性**  
+   在开发者控制台执行：
+   ```javascript
+   console.log('Store API:', typeof window.store);
+   console.log('PersistenceService:', typeof window.PersistenceService);
+   ```
+   预期输出：两者均为 `object`
+
+3. **基本读写操作**
+   ```javascript
+   // 读取状态
+   const state = window.store.getState();
+   console.log('当前状态:', state);
+   
+   // 写入数据
+   window.store.setState({
+     students: ['测试学生'],
+     words: ['apple']
+   });
+   
+   // 验证写入
+   console.log('新状态:', window.store.getState());
+   ```
+
+4. **数据持久化验证**
+   - 执行保存：`window.PersistenceService.saveData(['学生A'], ['hello']);`
+   - 关闭应用
+   - 重新启动：`npm start`
+   - 在控制台执行：`window.PersistenceService.loadData();`
+   - 确认数据与保存前一致
+
+### 打包与发布测试
+
+5. **本地打包**
+   ```bash
+   npm run build        # 当前平台
+   npm run build:mac    # macOS
+   npm run build:win    # Windows
+   ```
+   - 确认 `dist/` 目录生成安装包
+   - 无构建错误
+
+6. **安装包测试**
+   - 安装生成的应用
+   - 启动后执行上述第 2-4 项测试
+   - 确认持久化 API 正常工作
+   - 验证 `data/` 目录中的 Excel 文件可正常读取
+
+### 高级测试
+
+7. **离线构建验证**
+   ```bash
+   npm ci --offline
+   npm run build
+   ```
+   - 确认可从 `package-lock.json` 离线安装依赖
+
+8. **错误回退机制**
+   - 在控制台执行 `window.PersistenceService.setState('invalid');`
+   - 确认控制台显示错误信息且应用不崩溃
+
+9. **会话历史记录**
+   ```javascript
+   window.store.addSessionHistory({
+     student: '张三',
+     word: 'apple'
+   });
+   console.log(window.store.getState().sessionHistory);
+   ```
+   - 确认历史记录包含时间戳
+
+10. **清除会话**
+    ```javascript
+    window.store.clearSession();
+    ```
+    - 确认 `students` 和 `words` 被清空
+    - `settings` 保持不变
 
 ## 浏览器支持
 

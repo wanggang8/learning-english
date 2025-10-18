@@ -26,8 +26,12 @@
     "files": [
       "index.html",
       "style.css",
+      "renderer.js",
       "script.js",
       "main.js",
+      "preload.js",
+      "app/**/*",
+      "services/**/*",
       "assets/**/*",
       "data/**/*"
     ],
@@ -36,7 +40,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "assets/icon.icns"
@@ -48,7 +55,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico"
@@ -60,5 +69,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "单词小勇士"
     }
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2"
   }
 }

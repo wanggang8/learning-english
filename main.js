@@ -7,7 +7,8 @@ function createWindow() {
         height: 900,
         webPreferences: {
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
         },
         title: '🌟 单词小勇士',
         icon: path.join(__dirname, 'assets/icon.png'),
