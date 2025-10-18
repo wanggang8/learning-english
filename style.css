@@ -386,32 +386,67 @@ body {
 }
 
 .modal-content {
-    background: linear-gradient(135deg, #fff 0%, #ffe0e0 100%);
-    padding: 3rem;
-    border-radius: 20px;
-    border: 5px solid #ffd700;
-    box-shadow: 0 10px 50px rgba(0,0,0,0.5);
-    max-width: 600px;
-    width: 90%;
-    animation: scaleIn 0.3s ease;
+   background: linear-gradient(135deg, #fff 0%, #ffe0e0 100%);
+   padding: 3rem;
+   border-radius: 20px;
+   border: 5px solid #ffd700;
+   box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+   max-width: 600px;
+   width: 90%;
+   animation: scaleIn 0.3s ease;
 }
 
 .modal-content h3 {
-    font-size: 2rem;
-    color: #d32f2f;
-    margin-bottom: 1.5rem;
-    text-align: center;
+   font-size: 2rem;
+   color: #d32f2f;
+   margin-bottom: 1.5rem;
+   text-align: center;
+}
+
+/* 启动恢复弹层样式 */
+.startup-dialog {
+   background: linear-gradient(135deg, #fff 0%, #fff3f7 100%);
+}
+
+.startup-title {
+   font-weight: bold;
+}
+
+.startup-desc {
+   color: #555;
+   font-size: 1.05rem;
+   text-align: center;
+   margin-bottom: 1rem;
+}
+
+.startup-stats {
+   display: grid;
+   grid-template-columns: 1fr;
+   gap: 0.5rem;
+   margin-bottom: 1rem;
+}
+
+.startup-stat-item {
+   background: rgba(255,255,255,0.8);
+   border: 2px dashed #ffd700;
+   padding: 0.6rem 0.8rem;
+   border-radius: 12px;
+   color: #333;
+}
+
+.startup-actions {
+   margin-top: 1rem;
 }
 
 #wordInput {
-    width: 100%;
-    min-height: 200px;
-    font-size: 1.5rem;
-    padding: 1rem;
-    border: 3px solid #ffd700;
-    border-radius: 10px;
-    font-family: 'KaiTi', 'STKaiti', '楷体', serif;
-    resize: vertical;
+   width: 100%;
+   min-height: 200px;
+   font-size: 1.5rem;
+   padding: 1rem;
+   border: 3px solid #ffd700;
+   border-radius: 10px;
+   font-family: 'KaiTi', 'STKaiti', '楷体', serif;
+   resize: vertical;
 }
 
 .modal-buttons {
