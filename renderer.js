@@ -5,6 +5,8 @@ import './renderer/modules/feedback.js';
 import './renderer/modules/dataImporter.js';
 // 导入主脚本逻辑
 import './script.js';
+// 启动管理（恢复对话）
+import './renderer/modules/startupManager.js';
 
 // 检查持久化服务是否可用
 if (window.PersistenceService && window.PersistenceService.isStoreAvailable()) {
@@ -23,6 +25,11 @@ if (window.PersistenceService && window.PersistenceService.isStoreAvailable()) {
             }
         }
     }
+
+    // 非阻塞运行启动恢复流程
+    window.addEventListener('DOMContentLoaded', () => {
+        window.StartupManager && window.StartupManager.runStartupFlow();
+    });
 } else {
     console.warn('持久化服务不可用，将使用内存存储');
 }

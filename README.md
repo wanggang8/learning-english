@@ -166,6 +166,20 @@ npm run build:all
 - 预加载脚本（`preload.js`）通过 `contextBridge` 向渲染进程暴露 `window.store` API，渲染层可以通过 `services/persistence.js` 统一访问并处理错误。
 - 可通过 `window.PersistenceService.setErrorHandler(fn)` 注册统一错误提示钩子。
 
+### 启动自动恢复体验（Phase 1.1.3）
+
+- 应用启动时，`StartupManager` 会检查是否存在历史数据：
+  - 若检测到上次导入的学生/单词数据，会弹出“恢复上次数据”对话框；
+  - 你可以选择：
+    - 恢复：继续使用上次数据（默认已加载，操作仅显示提示）；
+    - 重新导入：不清空历史记录标记，清理本次会话的内存数据并弹出导入引导；
+    - 开始新会话：清空已保存的学生/单词与会话历史，进入导入引导；
+  - 若检测到历史数据不完整或损坏，系统会提示重新导入并自动降级到导入引导。
+
+- 相关 API（开发/调试用）：
+  - `window.StartupManager.runStartupFlow()` 手动触发启动检查与对话层；
+  - `window.prepareForReimport()` 进入重新导入模式（清空内存并显示导入引导）。
+
 ## 手动测试清单
 
 ### 基础测试

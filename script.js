@@ -457,6 +457,17 @@ function toggleMusic() {
     setMusicEnabled(!audioState.musicEnabled);
 }
 
+function prepareForReimport() {
+    setStudents([]);
+    setWords([]);
+    selectedStudent = null;
+    selectedWord = null;
+    switchScreen('startScreen');
+    if (!document.getElementById('filePrompt')) {
+        showFileUploadPrompt();
+    }
+}
+
 function initializeApp() {
     const restored = hydrateStateFromStore();
     bindAudioControls();
@@ -464,10 +475,6 @@ function initializeApp() {
 
     if (!students.length || !words.length) {
         showFileUploadPrompt();
-    } else if (window.Feedback && (restored.hasStudents || restored.hasWords)) {
-        window.Feedback.showSuccess(
-            `✅ 已恢复上次导入的数据：学生 ${students.length} 名 / 单词 ${words.length} 个`
-        );
     }
 }
 
@@ -483,5 +490,7 @@ Object.assign(window, {
     resetToStart,
     toggleMusic,
     loadBothExcelFiles,
-    useTestData
+    useTestData,
+    showFileUploadPrompt,
+    prepareForReimport
 });
