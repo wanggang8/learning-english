@@ -75,7 +75,22 @@ function setState(state) {
 }
 
 function updatePartial(updates) {
-  return execute('updatePartial', (api) => api.updatePartial(updates));
+  return execute('updatePartial', (api) => {
+    if (updates.importMetadata && typeof updates.importMetadata === 'object') {
+      const currentState = api.getState();
+      const currentImportMetadata = currentState.importMetadata || { students: {}, words: {} };
+      const mergedImportMetadata = {
+        students: { ...currentImportMetadata.students, ...(updates.importMetadata.students || {}) },
+        words: { ...currentImportMetadata.words, ...(updates.importMetadata.words || {}) }
+      };
+      const mergedUpdates = {
+        ...updates,
+        importMetadata: mergedImportMetadata
+      };
+      return api.updatePartial(mergedUpdates);
+    }
+    return api.updatePartial(updates);
+  });
 }
 
 function clearSession() {

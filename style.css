@@ -426,6 +426,199 @@ body {
     font-size: 1.5rem;
 }
 
+/* Toast 通知样式 */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    min-width: 300px;
+    max-width: 500px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.3s ease;
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-align: center;
+    white-space: pre-line;
+    pointer-events: auto;
+}
+
+.toast-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success {
+    background: linear-gradient(135deg, #6bcf7f, #4d96ff);
+    color: white;
+    border: 3px solid #fff;
+}
+
+.toast-error {
+    background: linear-gradient(135deg, #ff6b9d, #ff4757);
+    color: white;
+    border: 3px solid #fff;
+}
+
+.toast-info {
+    background: linear-gradient(135deg, #ffd93d, #ff9800);
+    color: white;
+    border: 3px solid #fff;
+}
+
+/* 音频设置面板 */
+.audio-settings-panel {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    width: 230px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 3px solid #ffd700;
+    border-radius: 15px;
+    padding: 1rem 1.2rem;
+    z-index: 950;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(3px);
+}
+
+.audio-settings-panel h4 {
+    margin-bottom: 0.8rem;
+    font-size: 1.2rem;
+    color: #d32f2f;
+    text-align: center;
+    font-weight: bold;
+}
+
+.audio-setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.audio-setting-row:last-child {
+    margin-bottom: 0;
+}
+
+.audio-settings-panel label {
+    font-size: 0.95rem;
+    color: #333;
+    font-weight: bold;
+}
+
+#volumeSlider {
+    width: 100%;
+    accent-color: #ff6b9d;
+}
+
+#playModeSelect {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 2px solid #ffd700;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: white;
+}
+
+#playModeSelect:focus {
+    outline: none;
+    border-color: #ff6b9d;
+    box-shadow: 0 0 6px rgba(255, 107, 157, 0.4);
+}
+
+/* 文件上传提示框样式 */
+.file-upload-prompt {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #fff 0%, #ffe5f5 100%);
+    padding: 2rem;
+    border-radius: 20px;
+    border: 5px solid #ffd700;
+    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+    z-index: 3000;
+    max-width: 600px;
+    width: 90%;
+    animation: scaleIn 0.3s ease;
+}
+
+.prompt-title {
+    color: #d32f2f;
+    font-size: 2rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.prompt-subtitle {
+    color: #666;
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-style: italic;
+}
+
+.prompt-field {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.prompt-field label {
+    display: block;
+    color: #333;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.prompt-field input[type="file"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.prompt-field small {
+    display: block;
+    color: #666;
+    margin-top: 0.3rem;
+    font-size: 0.9rem;
+}
+
+.prompt-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.prompt-actions button {
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.btn-primary.loading,
+.btn-secondary.loading {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .title {
@@ -468,5 +661,27 @@ body {
     .word-item {
         font-size: 1.5rem;
         padding: 1.5rem 0.5rem;
+    }
+
+    .toast {
+        min-width: 250px;
+        font-size: 1rem;
+    }
+
+    .file-upload-prompt {
+        width: 95%;
+        padding: 1.5rem;
+    }
+
+    .prompt-title {
+        font-size: 1.5rem;
+    }
+
+    .audio-settings-panel {
+        top: auto;
+        bottom: 100px;
+        right: 10px;
+        width: 200px;
+        padding: 0.8rem 1rem;
     }
 }

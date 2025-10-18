@@ -1,5 +1,8 @@
 // 导入持久化服务
 import './services/persistence.js';
+// 导入模块
+import './renderer/modules/feedback.js';
+import './renderer/modules/dataImporter.js';
 // 导入主脚本逻辑
 import './script.js';
 
@@ -11,6 +14,14 @@ if (window.PersistenceService && window.PersistenceService.isStoreAvailable()) {
     const loadResult = window.PersistenceService.loadData();
     if (loadResult.success && loadResult.data) {
         console.log('已加载持久化数据:', loadResult.data);
+        
+        // 如果有数据，显示统计信息
+        if (window.DataImporter) {
+            const stats = window.DataImporter.getImportStats();
+            if (stats) {
+                console.log('数据统计:', stats);
+            }
+        }
     }
 } else {
     console.warn('持久化服务不可用，将使用内存存储');
