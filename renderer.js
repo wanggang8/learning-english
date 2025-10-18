@@ -3,6 +3,7 @@ import './services/persistence.js';
 // 导入模块
 import './renderer/modules/feedback.js';
 import './renderer/modules/dataImporter.js';
+import './renderer/modules/drawStrategy.js';
 // 导入主脚本逻辑
 import './script.js';
 // 启动管理（恢复对话）

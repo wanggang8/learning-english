@@ -125,6 +125,31 @@ async function saveToStore(data, dataType, metadata) {
       }
     }
   };
+
+  // 若导入的是学生名单，补全 studentStats 默认值
+  if (dataType === DATA_TYPES.STUDENTS && Array.isArray(data)) {
+    try {
+      const state = window.PersistenceService.getState();
+      const existing = state && state.success && state.data.studentStats ? state.data.studentStats : {};
+      const next = { ...existing };
+      let changed = false;
+      data.forEach((name) => {
+        if (!next[name] || typeof next[name] !== 'object') {
+          next[name] = { drawCount: 0, lastDrawnAt: null, lastDrawMode: null };
+          changed = true;
+        } else {
+          if (typeof next[name].drawCount !== 'number') { next[name].drawCount = 0; changed = true; }
+          if (!('lastDrawnAt' in next[name])) { next[name].lastDrawnAt = null; changed = true; }
+          if (!('lastDrawMode' in next[name])) { next[name].lastDrawMode = null; changed = true; }
+        }
+      });
+      if (changed) {
+        updates.studentStats = next;
+      }
+    } catch (e) {
+      console.warn(`${MODULE_NAME} 初始化学生统计信息失败:`, e);
+    }
+  }
   
   const result = window.PersistenceService.updatePartial(updates);
   if (!result.success) {

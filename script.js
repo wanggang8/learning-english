@@ -12,6 +12,13 @@ const AUDIO_PLAY_MODES = Object.freeze({
     ONCE: 'once'
 });
 
+// 抽取模式
+const DRAW_MODES = Object.freeze({
+    RANDOM: 'random',
+    FAIR: 'fair'
+});
+let currentDrawMode = DRAW_MODES.RANDOM;
+
 let students = [];
 let availableStudents = [];
 let words = [];
@@ -43,6 +50,14 @@ function getPlayModeSelect() {
     return document.getElementById('playModeSelect');
 }
 
+function getDrawModeSelect() {
+    return document.getElementById('drawModeSelect');
+}
+
+function getModeIndicator() {
+    return document.getElementById('modeIndicator');
+}
+
 function persistSettings(partial) {
     if (!window.PersistenceService) {
         console.warn('PersistenceService 不可用，无法保存设置');
@@ -57,6 +72,55 @@ function persistSettings(partial) {
 function setStudents(list) {
     students = Array.isArray(list) ? Array.from(list) : [];
     availableStudents = [...students];
+    ensureStudentStatsDefaults();
+}
+
+function ensureStudentStatsDefaults() {
+    if (!window.PersistenceService || !Array.isArray(students)) return;
+    try {
+        const state = window.PersistenceService.getState();
+        if (!state.success) return;
+        const stats = state.data.studentStats || {};
+        let changed = false;
+        const next = { ...stats };
+        students.forEach((name) => {
+            if (!next[name] || typeof next[name] !== 'object') {
+                next[name] = { drawCount: 0, lastDrawnAt: null, lastDrawMode: null };
+                changed = true;
+            } else {
+                // 补全缺失字段
+                if (typeof next[name].drawCount !== 'number') { next[name].drawCount = 0; changed = true; }
+                if (!('lastDrawnAt' in next[name])) { next[name].lastDrawnAt = null; changed = true; }
+                if (!('lastDrawMode' in next[name])) { next[name].lastDrawMode = null; changed = true; }
+            }
+        });
+        if (changed) {
+            window.PersistenceService.updatePartial({ studentStats: next });
+        }
+    } catch (e) {
+        console.warn('初始化学生统计字段失败:', e);
+    }
+}
+
+function updateStudentStatsAfterPick(name, mode) {
+    if (!name || !window.PersistenceService) return;
+    try {
+        const state = window.PersistenceService.getState();
+        if (!state.success) return;
+        const stats = state.data.studentStats || {};
+        const prev = stats[name] || { drawCount: 0, lastDrawnAt: null, lastDrawMode: null };
+        const next = {
+            ...stats,
+            [name]: {
+                drawCount: (typeof prev.drawCount === 'number' ? prev.drawCount : 0) + 1,
+                lastDrawnAt: new Date().toISOString(),
+                lastDrawMode: mode || null
+            }
+        };
+        window.PersistenceService.updatePartial({ studentStats: next });
+    } catch (e) {
+        console.warn('更新学生统计失败:', e);
+    }
 }
 
 function setWords(list) {
@@ -90,6 +154,7 @@ function hydrateStateFromStore() {
             audioState.musicEnabled = typeof settings.musicEnabled === 'boolean' ? settings.musicEnabled : AUDIO_DEFAULTS.musicEnabled;
             audioState.volume = typeof settings.volume === 'number' ? clamp(settings.volume, 0, 1) : AUDIO_DEFAULTS.volume;
             audioState.playMode = settings.playMode || AUDIO_DEFAULTS.playMode;
+            currentDrawMode = (settings.drawMode === DRAW_MODES.FAIR || settings.drawMode === DRAW_MODES.RANDOM) ? settings.drawMode : DRAW_MODES.RANDOM;
             restored.hasSettings = true;
         }
     } catch (error) {
@@ -180,6 +245,26 @@ function updatePlayMode(mode, options = {}) {
     }
 }
 
+function updateDrawMode(mode, options = {}) {
+    const { persist = true } = options;
+    const values = Object.values(DRAW_MODES);
+    const nextMode = values.includes(mode) ? mode : DRAW_MODES.RANDOM;
+    currentDrawMode = nextMode;
+
+    const select = getDrawModeSelect();
+    if (select) {
+        select.value = nextMode;
+    }
+    const indicator = getModeIndicator();
+    if (indicator) {
+        indicator.textContent = nextMode === DRAW_MODES.FAIR ? '公平模式' : '完全随机';
+    }
+
+    if (persist) {
+        persistSettings({ drawMode: nextMode });
+    }
+}
+
 function bindAudioControls() {
     const slider = getVolumeSlider();
     if (slider) {
@@ -192,6 +277,13 @@ function bindAudioControls() {
     if (select) {
         select.addEventListener('change', (event) => {
             updatePlayMode(event.target.value);
+        });
+    }
+
+    const drawSelect = getDrawModeSelect();
+    if (drawSelect) {
+        drawSelect.addEventListener('change', (event) => {
+            updateDrawMode(event.target.value);
         });
     }
 }
@@ -409,11 +501,31 @@ function startDrawing() {
     setTimeout(() => {
         clearInterval(rollingInterval);
 
-        const randomIndex = Math.floor(Math.random() * availableStudents.length);
-        selectedStudent = availableStudents[randomIndex];
-        availableStudents.splice(randomIndex, 1);
+        let pickIndex = 0;
+        let pickValue = null;
+        try {
+            const state = window.PersistenceService?.getState();
+            const stats = state && state.success ? (state.data.studentStats || {}) : {};
+            if (window.DrawStrategy) {
+                const picked = window.DrawStrategy.pickStudent(availableStudents, { mode: currentDrawMode, stats });
+                pickIndex = picked.index;
+                pickValue = picked.value;
+            } else {
+                pickIndex = Math.floor(Math.random() * availableStudents.length);
+                pickValue = availableStudents[pickIndex];
+            }
+        } catch (e) {
+            console.warn('抽取策略失败，退化为随机:', e);
+            pickIndex = Math.floor(Math.random() * availableStudents.length);
+            pickValue = availableStudents[pickIndex];
+        }
+
+        selectedStudent = pickValue;
+        availableStudents.splice(pickIndex, 1);
 
         document.getElementById('selectedName').textContent = selectedStudent;
+        updateDrawMode(currentDrawMode, { persist: false }); // 刷新模式指示
+        updateStudentStatsAfterPick(selectedStudent, currentDrawMode);
         switchScreen('resultScreen');
     }, 2000);
 }
@@ -449,10 +561,10 @@ function displayWord(word) {
     switchScreen('wordScreen');
 }
 
-// 公平模式指标快照（目前为均匀随机）
+// 公平模式指标快照
 function createFairnessSnapshot() {
     return {
-        mode: 'uniform',
+        mode: currentDrawMode || DRAW_MODES.RANDOM,
         remainingStudents: Array.isArray(availableStudents) ? availableStudents.length : 0,
         remainingWords: Array.isArray(availableWords) ? availableWords.length : 0
     };
@@ -566,6 +678,9 @@ function initializeApp() {
     bindAudioControls();
     bindHistoryControls();
     initializeAudio();
+    updateDrawMode(currentDrawMode, { persist: false });
+
+    try { window.DrawStrategy && window.DrawStrategy.runAssertions && window.DrawStrategy.runAssertions(); } catch (e) { console.warn('抽取策略断言未通过:', e); }
 
     if (!students.length || !words.length) {
         showFileUploadPrompt();
