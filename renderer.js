@@ -1,5 +1,7 @@
 // 导入持久化服务
 import './services/persistence.js';
+// 统一通知组件（必须尽早加载）
+import './renderer/components/toast.js';
 // 导入模块
 import './renderer/modules/feedback.js';
 import './renderer/modules/dataImporter.js';
@@ -17,6 +19,14 @@ import './script.js';
 // 启动管理（恢复对话）
 import './renderer/modules/startupManager.js';
 import './renderer/modules/dragDropUpload.js';
+
+// 设置持久化服务的统一错误提示
+try {
+    window.PersistenceService?.setErrorHandler?.((op, err) => {
+        const msg = err?.message || '未知错误';
+        (window.Toast?.error || window.Feedback?.showError || console.error)(`存储失败：${op}（${msg}）`);
+    });
+} catch (e) {}
 
 // 检查持久化服务是否可用
 if (window.PersistenceService && window.PersistenceService.isStoreAvailable()) {

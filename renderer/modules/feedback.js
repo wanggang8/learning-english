@@ -2,6 +2,7 @@ const TOAST_CONTAINER_ID = 'toast-container';
 
 const TOAST_TYPES = {
   SUCCESS: 'success',
+  WARNING: 'warning',
   ERROR: 'error',
   INFO: 'info'
 };
@@ -18,6 +19,11 @@ function ensureContainer() {
 }
 
 function showToast(message, type = TOAST_TYPES.INFO, duration = 4000) {
+  // 若新 Toast 组件可用，则直接委托
+  if (window.Toast && typeof window.Toast.show === 'function') {
+    window.Toast.show(message, type, duration);
+    return;
+  }
   const container = ensureContainer();
   const toast = document.createElement('div');
   toast.classList.add('toast');
@@ -48,9 +54,14 @@ function showSuccess(message, duration = 3000) {
   showToast(message, TOAST_TYPES.SUCCESS, duration);
 }
 
+function showWarning(message, duration = 4500) {
+  showToast(message, TOAST_TYPES.WARNING, duration);
+}
+
 window.Feedback = Object.freeze({
   TOAST_TYPES,
   showToast,
   showError,
-  showSuccess
+  showSuccess,
+  showWarning
 });

@@ -23,16 +23,25 @@ const DATA_TYPES = {
 function readFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       resolve(e.target.result);
     };
-    
+
     reader.onerror = () => {
-      reject(new Error('读取文件失败'));
+      const reason = reader.error && reader.error.message ? reader.error.message : '未知错误';
+      reject(new Error(`读取文件失败：${reason}`));
     };
-    
-    reader.readAsArrayBuffer(file);
+
+    reader.onabort = () => {
+      reject(new Error('读取已被取消'));
+    };
+
+    try {
+      reader.readAsArrayBuffer(file);
+    } catch (e) {
+      reject(new Error(`无法读取文件：${e?.message || '未知错误'}`));
+    }
   });
 }
 
@@ -45,18 +54,21 @@ function parseExcelData(arrayBuffer) {
   if (typeof XLSX === 'undefined') {
     throw new Error('XLSX 库未加载');
   }
-  
-  const data = new Uint8Array(arrayBuffer);
-  const workbook = XLSX.read(data, { type: 'array' });
-  
-  if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-    throw new Error('Excel 文件中没有找到工作表');
+  try {
+    const data = new Uint8Array(arrayBuffer);
+    const workbook = XLSX.read(data, { type: 'array' });
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('Excel 文件中没有找到工作表');
+    }
+
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+    return jsonData;
+  } catch (e) {
+    throw new Error(`Excel 解析失败：${e?.message || '未知错误'}`);
   }
-  
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-  
-  return jsonData;
 }
 
 /**
@@ -66,38 +78,68 @@ function parseExcelData(arrayBuffer) {
  * @returns {Object} 验证结果
  */
 function validateAndCleanData(rawData, dataType) {
-  if (!Array.isArray(rawData)) {
-    return {
-      valid: false,
-      error: '数据格式不正确',
-      data: []
-    };
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    return { valid: false, error: '数据格式不正确或为空', data: [] };
   }
-  
-  // 跳过表头（第一行）
-  const result = [];
+
+  const header = Array.isArray(rawData[0]) ? rawData[0] : null;
+  if (!header) {
+    return { valid: false, error: '未检测到表头行（第 1 行）', data: [] };
+  }
+
+  const firstHeaderCell = header[0] == null ? '' : String(header[0]).trim().toLowerCase();
+  const needStudents = dataType === DATA_TYPES.STUDENTS;
+  const needWords = dataType === DATA_TYPES.WORDS;
+
+  const okStudents = ['姓名', 'name', 'student', '学生', 'student name'].some(k => firstHeaderCell.includes(k.toLowerCase()));
+  const okWords = ['单词', 'word', 'vocabulary', '词汇'].some(k => firstHeaderCell.includes(k.toLowerCase()));
+
+  if (needStudents && !okStudents) {
+    return { valid: false, error: '未检测到表头“姓名”。请确认第一行第一列为“姓名”。', data: [] };
+  }
+  if (needWords && !okWords) {
+    return { valid: false, error: '未检测到表头“单词”。请确认第一行第一列为“单词”。', data: [] };
+  }
+
+  const cleaned = [];
+  const seen = new Set();
+  let emptyRows = 0;
+  let invalidRows = 0;
+  let duplicateCount = 0;
+
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
-    if (row && row[0]) {
-      const value = row[0].toString().trim();
-      if (value) {
-        result.push(value);
-      }
-    }
+    if (!Array.isArray(row)) { invalidRows++; continue; }
+    const cell = row[0];
+    if (cell == null) { emptyRows++; continue; }
+    if (typeof cell !== 'string' && typeof cell !== 'number') { invalidRows++; continue; }
+
+    const value = String(cell).trim();
+    if (!value) { emptyRows++; continue; }
+
+    if (seen.has(value)) { duplicateCount++; continue; }
+    seen.add(value);
+    cleaned.push(value);
   }
-  
-  if (result.length === 0) {
+
+  if (cleaned.length === 0) {
     return {
       valid: false,
       error: `${dataType === DATA_TYPES.STUDENTS ? '学生名单' : '单词列表'}中没有找到有效数据`,
       data: []
     };
   }
-  
+
+  const warnings = [];
+  if (duplicateCount > 0) warnings.push(`已去重 ${duplicateCount} 个重复项`);
+  if (invalidRows > 0) warnings.push(`检测到 ${invalidRows} 行格式异常，已跳过`);
+  if (emptyRows > 0) warnings.push(`检测到 ${emptyRows} 行空白，已跳过`);
+
   return {
     valid: true,
-    data: result,
-    count: result.length
+    data: cleaned,
+    count: cleaned.length,
+    warnings
   };
 }
 
@@ -175,14 +217,14 @@ async function saveToStore(data, dataType, metadata) {
  */
 async function importExcelFile(file, dataType) {
   try {
-    console.log(`${MODULE_NAME} 开始导入 ${dataType} Excel:`, file.name);
-    
+    console.log(`${MODULE_NAME} 开始导入 ${dataType} Excel:`, file?.name || '(未命名)');
+
     // 1. 读取文件
     const arrayBuffer = await readFile(file);
-    
+
     // 2. 解析 Excel
     const rawData = parseExcelData(arrayBuffer);
-    
+
     // 3. 验证和清理数据
     const validation = validateAndCleanData(rawData, dataType);
     if (!validation.valid) {
@@ -192,25 +234,26 @@ async function importExcelFile(file, dataType) {
         data: []
       };
     }
-    
+
     // 4. 保存到存储
     const metadata = {
       filename: file.name,
       filepath: file.path || null,
       sourceType: SOURCE_TYPES.EXCEL
     };
-    
+
     await saveToStore(validation.data, dataType, metadata);
-    
+
     console.log(`${MODULE_NAME} 成功导入 ${dataType}:`, validation.count);
-    
+
     return {
       success: true,
       data: validation.data,
       count: validation.count,
-      filename: file.name
+      filename: file.name,
+      warnings: validation.warnings || []
     };
-    
+
   } catch (error) {
     console.error(`${MODULE_NAME} 导入失败:`, error);
     return {
@@ -275,7 +318,8 @@ async function importBothFiles(studentsFile, wordsFile) {
     students: null,
     words: null,
     success: false,
-    errors: []
+    errors: [],
+    warnings: []
   };
   
   try {
@@ -290,10 +334,14 @@ async function importBothFiles(studentsFile, wordsFile) {
     
     if (!studentsResult.success) {
       results.errors.push(`学生名单: ${studentsResult.error}`);
+    } else if (Array.isArray(studentsResult.warnings) && studentsResult.warnings.length) {
+      results.warnings.push(...studentsResult.warnings.map(w => `学生名单：${w}`));
     }
     
     if (!wordsResult.success) {
       results.errors.push(`单词列表: ${wordsResult.error}`);
+    } else if (Array.isArray(wordsResult.warnings) && wordsResult.warnings.length) {
+      results.warnings.push(...wordsResult.warnings.map(w => `单词列表：${w}`));
     }
     
     results.success = studentsResult.success && wordsResult.success;

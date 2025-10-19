@@ -544,7 +544,13 @@ body.fullscreen-active .container {
 }
 
 .toast-info {
-    background: linear-gradient(135deg, #ffd93d, #ff9800);
+    background: linear-gradient(135deg, #ffd93d, #ffb300);
+    color: white;
+    border: 3px solid #fff;
+}
+
+.toast-warning {
+    background: linear-gradient(135deg, #ffb74d, #ff7043);
     color: white;
     border: 3px solid #fff;
 }

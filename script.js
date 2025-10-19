@@ -399,22 +399,13 @@ async function loadBothExcelFiles() {
 
     if (!studentsFile || !wordsFile) {
         resetButtonState();
-        if (window.Feedback) {
-            window.Feedback.showError('请同时选择学生名单和单词列表两个 Excel 文件');
-        } else {
-            alert('请选择学生名单和单词列表两个 Excel 文件！');
-        }
+        window.Feedback?.showError('请同时选择学生名单和单词列表两个 Excel 文件');
         return;
     }
 
     if (!window.DataImporter) {
         resetButtonState();
-        const message = '数据导入模块未加载，请重试';
-        if (window.Feedback) {
-            window.Feedback.showError(message);
-        } else {
-            alert(message);
-        }
+        window.Feedback?.showError('数据导入模块未加载，请重试');
         return;
     }
 
@@ -434,12 +425,11 @@ async function loadBothExcelFiles() {
                 prompt.remove();
             }
 
-            if (window.Feedback) {
-                window.Feedback.showSuccess(
-                    `✅ 数据已自动保存！\n学生: ${students.length} 名\n单词: ${words.length} 个`
-                );
-            } else {
-                alert(`成功加载并保存！\n学生: ${students.length} 名\n单词: ${words.length} 个`);
+            window.Feedback?.showSuccess(
+                `✅ 数据已自动保存！\n学生: ${students.length} 名\n单词: ${words.length} 个`
+            );
+            if (Array.isArray(results?.warnings) && results.warnings.length) {
+                window.Feedback?.showWarning(`注意：\n${results.warnings.join('\n')}`);
             }
 
             console.log('成功导入并保存数据:', {
@@ -448,19 +438,11 @@ async function loadBothExcelFiles() {
             });
         } else {
             const errorMsg = results.errors?.length ? results.errors.join('\n') : '导入失败';
-            if (window.Feedback) {
-                window.Feedback.showError(`❌ 导入失败：\n${errorMsg}`);
-            } else {
-                alert(`导入失败：\n${errorMsg}`);
-            }
+            window.Feedback?.showError(`❌ 导入失败：\n${errorMsg}`);
         }
     } catch (error) {
         console.error('导入异常:', error);
-        if (window.Feedback) {
-            window.Feedback.showError(`❌ 导入异常：${error.message}`);
-        } else {
-            alert(`导入异常：${error.message}`);
-        }
+        window.Feedback?.showError(`❌ 导入异常：${error.message}`);
     } finally {
         resetButtonState();
     }
@@ -477,7 +459,7 @@ async function useTestData() {
         if (prompt) {
             prompt.remove();
         }
-        alert('已加载测试数据\n学生: 8名\n单词: 10个');
+        window.Feedback?.showSuccess('✅ 已加载测试数据\n学生: 8名\n单词: 10个');
         return;
     }
 
@@ -496,11 +478,7 @@ async function useTestData() {
                 prompt.remove();
             }
 
-            if (window.Feedback) {
-                window.Feedback.showSuccess('✅ 测试数据已自动保存！\n学生: 8名\n单词: 10个');
-            } else {
-                alert('已加载测试数据并保存\n学生: 8名\n单词: 10个');
-            }
+            window.Feedback?.showSuccess('✅ 测试数据已自动保存！\n学生: 8名\n单词: 10个');
 
             console.log('成功导入测试数据');
         } else {
@@ -508,11 +486,7 @@ async function useTestData() {
         }
     } catch (error) {
         console.error('导入测试数据异常:', error);
-        if (window.Feedback) {
-            window.Feedback.showError(`❌ 导入测试数据失败：${error.message}`);
-        } else {
-            alert(`导入测试数据失败：${error.message}`);
-        }
+        window.Feedback?.showError(`❌ 导入测试数据失败：${error.message}`);
     }
 }
 
@@ -578,11 +552,7 @@ function startDrawing() {
 
 function showWordInput() {
     if (availableWords.length === 0) {
-        if (window.Feedback) {
-            window.Feedback.showError('所有单词都已被抽取，已无可抽取的单词');
-        } else {
-            alert('所有单词都已被抽取！');
-        }
+        window.Feedback?.showError('所有单词都已被抽取，已无可抽取的单词');
         return;
     }
 
