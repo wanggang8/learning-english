@@ -41,7 +41,8 @@ const DEFAULT_STATE = {
       sourceType: null,
       count: 0
     }
-  }
+  },
+  excludedStudents: []
 };
 
 const schema = {
@@ -266,6 +267,13 @@ const schema = {
       }
     },
     additionalProperties: false
+  },
+  excludedStudents: {
+    type: 'array',
+    default: [],
+    items: {
+      type: 'string'
+    }
   }
 };
 
@@ -417,7 +425,8 @@ function getState() {
       settings: store.get('settings', getDefaultValue('settings')),
       sessionHistory: store.get('sessionHistory', getDefaultValue('sessionHistory')),
       metadata: store.get('metadata', getDefaultValue('metadata')),
-      importMetadata: store.get('importMetadata', getDefaultValue('importMetadata'))
+      importMetadata: store.get('importMetadata', getDefaultValue('importMetadata')),
+      excludedStudents: store.get('excludedStudents', getDefaultValue('excludedStudents'))
     })
   );
 }
