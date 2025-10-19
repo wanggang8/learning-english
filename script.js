@@ -761,6 +761,119 @@ function showResetExclusionDialog() {
     document.getElementById('cancelResetExcludedBtn')?.addEventListener('click', cleanup);
 }
 
+// 仅重置“统计”到初始状态（对当前学生名单），不动名单与历史
+function resetAllStats({ silent = false } = {}) {
+    try {
+        const res = window.PersistenceService?.setState({ studentStats: {} });
+        if (res && res.success === false) {
+            throw new Error(res.error || '写入存储失败');
+        }
+        if (!silent) {
+            window.Feedback?.showSuccess('已重置所有学生的抽取统计');
+        }
+        return true;
+    } catch (e) {
+        if (!silent) {
+            window.Feedback?.showError(`重置统计失败：${e.message}`);
+        }
+        return false;
+    }
+}
+
+// 开始新会话：保留学生与单词，清空统计、历史与当前轮排除
+function resetSession() {
+    try {
+        resetAllStats({ silent: true });
+        try { window.PersistenceService?.clearHistory({ scope: 'all' }); } catch (e) {}
+        resetExcludedStudents({ silent: true });
+        selectedStudent = null;
+        selectedWord = null;
+        availableStudents = students.slice();
+        updateDrawMode(currentDrawMode, { persist: false });
+        try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
+        window.Feedback?.showSuccess('已开始新会话：统计与历史已清空，名单已保留');
+        return true;
+    } catch (e) {
+        window.Feedback?.showError(`开始新会话失败：${e.message}`);
+        return false;
+    }
+}
+
+// 完全重置：清空所有数据（学生、单词、历史、统计、排除、导入记录），保留设置
+function fullReset() {
+    try {
+        const emptyMeta = { filename: null, filepath: null, importedAt: null, sourceType: null, count: 0 };
+        const setRes = window.PersistenceService?.setState({
+            students: [],
+            words: [],
+            studentStats: {},
+            excludedStudents: [],
+            importMetadata: { students: emptyMeta, words: emptyMeta }
+        });
+        if (setRes && setRes.success === false) {
+            throw new Error(setRes.error || '写入存储失败');
+        }
+        try { window.PersistenceService?.clearHistory({ scope: 'all' }); } catch (e) {}
+        prepareForReimport();
+        try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
+        window.Feedback?.showSuccess('已完成完全重置，请重新导入学生与单词数据');
+        return true;
+    } catch (e) {
+        window.Feedback?.showError(`完全重置失败：${e.message}`);
+        return false;
+    }
+}
+
+// 确认对话：开始新会话
+function showNewSessionDialog() {
+    if (document.getElementById('newSessionModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'newSessionModal';
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>开始新会话</h3>
+            <p>将清空：抽取历史（当前与归档）、所有学生的抽取统计、当前轮排除列表。\n保留：学生名单与单词列表、导入记录与设置。</p>
+            <div class="modal-buttons">
+                <button id="confirmNewSessionBtn" class="btn-secondary">确认开始</button>
+                <button id="cancelNewSessionBtn" class="btn-primary">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const cleanup = () => { modal.remove(); };
+    document.getElementById('confirmNewSessionBtn')?.addEventListener('click', () => {
+        resetSession();
+        cleanup();
+    });
+    document.getElementById('cancelNewSessionBtn')?.addEventListener('click', cleanup);
+}
+
+// 确认对话：完全重置
+function showFullResetDialog() {
+    if (document.getElementById('fullResetModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'fullResetModal';
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>完全重置</h3>
+            <p>将删除所有数据：学生名单、单词列表、抽取历史（含归档）、学生抽取统计、当前轮排除列表以及导入记录。\n保留：音乐/抽取模式等设置。重置后需要重新导入数据。</p>
+            <div class="modal-buttons">
+                <button id="confirmFullResetBtn" class="btn-back">确认重置</button>
+                <button id="cancelFullResetBtn" class="btn-primary">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const cleanup = () => { modal.remove(); };
+    document.getElementById('confirmFullResetBtn')?.addEventListener('click', () => {
+        fullReset();
+        cleanup();
+    });
+    document.getElementById('cancelFullResetBtn')?.addEventListener('click', cleanup);
+}
+
 function prepareForReimport() {
     setStudents([]);
     setWords([]);
@@ -780,6 +893,14 @@ function bindHistoryControls() {
     const resetBtn = document.getElementById('resetExcludedBtn');
     if (resetBtn) {
         resetBtn.addEventListener('click', showResetExclusionDialog);
+    }
+    const nsBtn = document.getElementById('newSessionBtn');
+    if (nsBtn) {
+        nsBtn.addEventListener('click', showNewSessionDialog);
+    }
+    const frBtn = document.getElementById('fullResetBtn');
+    if (frBtn) {
+        frBtn.addEventListener('click', showFullResetDialog);
     }
 }
 
@@ -815,5 +936,11 @@ Object.assign(window, {
     showClearHistoryDialog,
     showResetExclusionDialog,
     showResetRoundDialog,
-    resetExcludedStudents
+    resetExcludedStudents,
+    // 新增：会话控制
+    resetAllStats,
+    resetSession,
+    showNewSessionDialog,
+    showFullResetDialog,
+    fullReset
 });
