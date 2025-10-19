@@ -4,8 +4,14 @@ import './services/persistence.js';
 import './renderer/modules/feedback.js';
 import './renderer/modules/dataImporter.js';
 import './renderer/modules/drawStrategy.js';
-// 历史面板组件
+// 事件总线与命令
+import './renderer/modules/eventBus.js';
+import './renderer/modules/commands.js';
+// 组件
 import './renderer/components/historyPanel.js';
+import './renderer/components/shortcutHelp.js';
+// 键盘管理器（依赖于 AppCommands 与组件）
+import './renderer/modules/keyboardManager.js';
 // 导入主脚本逻辑
 import './script.js';
 // 启动管理（恢复对话）

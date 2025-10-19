@@ -236,25 +236,11 @@
     if (visible) hide(); else show();
   }
 
-  function bindKeyboard() {
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'h' || e.key === 'H') {
-        e.preventDefault();
-        toggle();
-      } else if (e.key === 'Escape') {
-        if (visible) {
-          e.preventDefault();
-          hide();
-        }
-      }
-    });
-  }
-
   function init() {
     readStateFromStorage();
     ensurePanel();
     ensureToggleButton();
-    bindKeyboard();
+    // 键盘快捷键由 KeyboardManager 统一处理
     setSortMode(sortMode);
     if (visible) {
       show();
