@@ -26,6 +26,7 @@ let availableWords = [];
 let selectedStudent = null;
 let selectedWord = null;
 let rollingInterval = null;
+let excludedStudentsSet = new Set();
 
 const audioState = {
     musicEnabled: AUDIO_DEFAULTS.musicEnabled,
@@ -71,7 +72,18 @@ function persistSettings(partial) {
 
 function setStudents(list) {
     students = Array.isArray(list) ? Array.from(list) : [];
-    availableStudents = [...students];
+    // 加载持久化的排除集合，并与当前学生名单对齐
+    try {
+        const state = window.PersistenceService?.getState();
+        const excluded = state && state.success && Array.isArray(state.data?.excludedStudents)
+            ? state.data.excludedStudents
+            : [];
+        // 仅保留仍在当前学生名单中的条目
+        excludedStudentsSet = new Set(excluded.filter((name) => students.includes(name)));
+    } catch (e) {
+        excludedStudentsSet = new Set();
+    }
+    availableStudents = students.filter((name) => !excludedStudentsSet.has(name));
     ensureStudentStatsDefaults();
 }
 
@@ -120,6 +132,39 @@ function updateStudentStatsAfterPick(name, mode) {
         window.PersistenceService.updatePartial({ studentStats: next });
     } catch (e) {
         console.warn('更新学生统计失败:', e);
+    }
+}
+
+// 更新排除集合并持久化
+function updateExcludedAfterPick(name) {
+    if (!name) return;
+    try {
+        const state = window.PersistenceService?.getState();
+        const current = state && state.success && Array.isArray(state.data?.excludedStudents)
+            ? state.data.excludedStudents.slice()
+            : [];
+        if (!current.includes(name)) {
+            current.push(name);
+            window.PersistenceService?.updatePartial({ excludedStudents: current });
+        }
+        // 与当前学生名单对齐
+        excludedStudentsSet = new Set(current.filter((n) => students.includes(n)));
+    } catch (e) {
+        // 忽略
+    }
+}
+
+// 清空排除集合（不影响统计）
+function resetExcludedStudents({ silent = false } = {}) {
+    try {
+        window.PersistenceService?.updatePartial({ excludedStudents: [] });
+    } catch (e) {
+        // 忽略
+    }
+    excludedStudentsSet = new Set();
+    availableStudents = students.slice();
+    if (!silent) {
+        window.Feedback?.showSuccess('已重置当前轮的排除列表');
     }
 }
 
@@ -480,11 +525,8 @@ function switchScreen(screenId) {
 
 function startDrawing() {
     if (availableStudents.length === 0) {
-        if (window.Feedback) {
-            window.Feedback.showError('所有学生都已被抽取，已无可抽取的学生');
-        } else {
-            alert('所有学生都已被抽取！');
-        }
+        window.Feedback?.showToast('本轮所有学生已被抽到，点击“重新开始本轮”即可继续', window.Feedback.TOAST_TYPES.INFO, 5000);
+        showResetRoundDialog();
         return;
     }
 
@@ -522,10 +564,14 @@ function startDrawing() {
 
         selectedStudent = pickValue;
         availableStudents.splice(pickIndex, 1);
+        updateExcludedAfterPick(selectedStudent);
 
         document.getElementById('selectedName').textContent = selectedStudent;
         updateDrawMode(currentDrawMode, { persist: false }); // 刷新模式指示
         updateStudentStatsAfterPick(selectedStudent, currentDrawMode);
+        if (availableStudents.length === 0) {
+            window.Feedback?.showToast('🎉 本轮所有学生已抽完！可选择“重新开始本轮”继续', window.Feedback.TOAST_TYPES.INFO, 4500);
+        }
         switchScreen('resultScreen');
     }, 2000);
 }
@@ -592,6 +638,10 @@ function resetToStart() {
     switchScreen('startScreen');
     selectedStudent = null;
     selectedWord = null;
+    if (availableStudents.length === 0) {
+        window.Feedback?.showToast('本轮所有学生已抽完，是否重新开始本轮？', window.Feedback.TOAST_TYPES.INFO, 4500);
+        showResetRoundDialog();
+    }
 }
 
 function toggleMusic() {
@@ -655,6 +705,58 @@ function showClearHistoryDialog() {
     document.getElementById('cancelClearHistoryBtn')?.addEventListener('click', cleanup);
 }
 
+// 抽完所有学生后的自动提示模态
+function showResetRoundDialog() {
+    if (document.getElementById('resetRoundModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'resetRoundModal';
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>重新开始本轮</h3>
+            <p>已抽到所有学生。是否清空本轮排除列表并重新开始？（不影响统计）</p>
+            <div class="modal-buttons">
+                <button id="confirmResetRoundBtn" class="btn-secondary">重新开始本轮</button>
+                <button id="cancelResetRoundBtn" class="btn-primary">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const cleanup = () => { modal.remove(); };
+    document.getElementById('confirmResetRoundBtn')?.addEventListener('click', () => {
+        resetExcludedStudents({ silent: true });
+        window.Feedback?.showSuccess('已重新开始本轮');
+        cleanup();
+    });
+    document.getElementById('cancelResetRoundBtn')?.addEventListener('click', cleanup);
+}
+
+// 设置面板：手动重置排除列表
+function showResetExclusionDialog() {
+    if (document.getElementById('resetExcludedModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'resetExcludedModal';
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>手动重置排除列表</h3>
+            <p>确定要清空本轮“已抽学生”的排除列表吗？（不会影响统计）</p>
+            <div class="modal-buttons">
+                <button id="confirmResetExcludedBtn" class="btn-back">确认重置</button>
+                <button id="cancelResetExcludedBtn" class="btn-primary">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const cleanup = () => { modal.remove(); };
+    document.getElementById('confirmResetExcludedBtn')?.addEventListener('click', () => {
+        resetExcludedStudents({ silent: true });
+        window.Feedback?.showSuccess('已清空本轮排除列表');
+        cleanup();
+    });
+    document.getElementById('cancelResetExcludedBtn')?.addEventListener('click', cleanup);
+}
+
 function prepareForReimport() {
     setStudents([]);
     setWords([]);
@@ -670,6 +772,10 @@ function bindHistoryControls() {
     const btn = document.getElementById('clearHistoryBtn');
     if (btn) {
         btn.addEventListener('click', showClearHistoryDialog);
+    }
+    const resetBtn = document.getElementById('resetExcludedBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', showResetExclusionDialog);
     }
 }
 
@@ -702,5 +808,8 @@ Object.assign(window, {
     useTestData,
     showFileUploadPrompt,
     prepareForReimport,
-    showClearHistoryDialog
+    showClearHistoryDialog,
+    showResetExclusionDialog,
+    showResetRoundDialog,
+    resetExcludedStudents
 });
