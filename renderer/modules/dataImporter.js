@@ -18,13 +18,29 @@ const DATA_TYPES = {
 /**
  * 读取文件并返回 ArrayBuffer
  * @param {File} file - 要读取的文件
+ * @param {(p:{phase:string,progress?:number,message?:string})=>void} [onProgress] - 进度回调
  * @returns {Promise<ArrayBuffer>} 文件内容
  */
-function readFile(file) {
+function readFile(file, onProgress) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
+    try {
+      reader.onprogress = (e) => {
+        try {
+          if (onProgress) {
+            if (e && e.lengthComputable) {
+              onProgress({ phase: 'read', progress: e.total ? (e.loaded / e.total) : 0, message: `正在读取 ${file?.name || ''}...` });
+            } else {
+              onProgress({ phase: 'read', message: `正在读取 ${file?.name || ''}...` });
+            }
+          }
+        } catch (_) {}
+      };
+    } catch (_) {}
+
     reader.onload = (e) => {
+      try { onProgress && onProgress({ phase: 'read', progress: 1 }); } catch (_) {}
       resolve(e.target.result);
     };
 
@@ -213,17 +229,23 @@ async function saveToStore(data, dataType, metadata) {
  * 导入 Excel 文件
  * @param {File} file - Excel 文件
  * @param {string} dataType - 数据类型（students/words）
+ * @param {(p:{phase:string,progress?:number,message?:string})=>void} [onProgress] - 进度回调
  * @returns {Promise<Object>} 导入结果
  */
-async function importExcelFile(file, dataType) {
+async function importExcelFile(file, dataType, onProgress) {
   try {
     console.log(`${MODULE_NAME} 开始导入 ${dataType} Excel:`, file?.name || '(未命名)');
 
+    // 0. 初始化提示
+    try { onProgress && onProgress({ phase: 'start', progress: 0, message: `开始导入：${file?.name || ''}` }); } catch (_) {}
+
     // 1. 读取文件
-    const arrayBuffer = await readFile(file);
+    const arrayBuffer = await readFile(file, onProgress);
 
     // 2. 解析 Excel
+    try { onProgress && onProgress({ phase: 'parse-start', progress: 0.35, message: '正在解析 Excel...' }); } catch (_) {}
     const rawData = parseExcelData(arrayBuffer);
+    try { onProgress && onProgress({ phase: 'parse', progress: 0.6, message: '解析完成，正在校验...' }); } catch (_) {}
 
     // 3. 验证和清理数据
     const validation = validateAndCleanData(rawData, dataType);
@@ -234,6 +256,7 @@ async function importExcelFile(file, dataType) {
         data: []
       };
     }
+    try { onProgress && onProgress({ phase: 'validate', progress: 0.75, message: '校验完成，正在保存...' }); } catch (_) {}
 
     // 4. 保存到存储
     const metadata = {
@@ -242,9 +265,12 @@ async function importExcelFile(file, dataType) {
       sourceType: SOURCE_TYPES.EXCEL
     };
 
+    try { onProgress && onProgress({ phase: 'save', progress: 0.9, message: '正在保存...' }); } catch (_) {}
     await saveToStore(validation.data, dataType, metadata);
 
     console.log(`${MODULE_NAME} 成功导入 ${dataType}:`, validation.count);
+
+    try { onProgress && onProgress({ phase: 'done', progress: 1, message: '完成' }); } catch (_) {}
 
     return {
       success: true,
@@ -311,9 +337,10 @@ async function importTestData(data, dataType) {
  * 批量导入两个 Excel 文件（学生和单词）
  * @param {File} studentsFile - 学生名单文件
  * @param {File} wordsFile - 单词列表文件
+ * @param {(p:{phase:string,progress?:number,message?:string})=>void} [onProgress] - 总进度回调
  * @returns {Promise<Object>} 导入结果
  */
-async function importBothFiles(studentsFile, wordsFile) {
+async function importBothFiles(studentsFile, wordsFile, onProgress) {
   const results = {
     students: null,
     words: null,
@@ -323,10 +350,31 @@ async function importBothFiles(studentsFile, wordsFile) {
   };
   
   try {
+    let progA = 0, progB = 0;
+    const update = () => {
+      try { onProgress && onProgress({ phase: 'batch', progress: (progA + progB) / 2, message: '正在导入 2 个文件...' }); } catch (_) {}
+    };
+    const mkCb = (label, setter) => (p) => {
+      const m = (() => {
+        switch (p?.phase) {
+          case 'read': return `正在读取${label}文件...`;
+          case 'parse-start':
+          case 'parse': return `正在解析${label}数据...`;
+          case 'validate': return `正在校验${label}数据...`;
+          case 'save': return `正在保存${label}数据...`;
+          case 'done': return `${label}导入完成`;
+          default: return `正在导入${label}...`;
+        }
+      })();
+      const v = typeof p?.progress === 'number' ? p.progress : (p?.phase === 'done' ? 1 : 0);
+      setter(v);
+      try { onProgress && onProgress({ phase: 'batch', progress: (progA + progB) / 2, message: m }); } catch (_) {}
+    };
+
     // 并行导入两个文件
     const [studentsResult, wordsResult] = await Promise.all([
-      importExcelFile(studentsFile, DATA_TYPES.STUDENTS),
-      importExcelFile(wordsFile, DATA_TYPES.WORDS)
+      importExcelFile(studentsFile, DATA_TYPES.STUDENTS, mkCb('学生', (v)=>{ progA = Math.max(progA, v); update(); })),
+      importExcelFile(wordsFile, DATA_TYPES.WORDS, mkCb('单词', (v)=>{ progB = Math.max(progB, v); update(); }))
     ]);
     
     results.students = studentsResult;

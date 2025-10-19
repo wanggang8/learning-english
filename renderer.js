@@ -2,6 +2,8 @@
 import './services/persistence.js';
 // 统一通知组件（必须尽早加载）
 import './renderer/components/toast.js';
+// Loading 覆盖层（尽早加载以便全局可用）
+import './renderer/components/loadingOverlay.js';
 // 导入模块
 import './renderer/modules/feedback.js';
 import './renderer/modules/dataImporter.js';
