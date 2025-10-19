@@ -16,6 +16,7 @@ import './renderer/modules/keyboardManager.js';
 import './script.js';
 // 启动管理（恢复对话）
 import './renderer/modules/startupManager.js';
+import './renderer/modules/dragDropUpload.js';
 
 // 检查持久化服务是否可用
 if (window.PersistenceService && window.PersistenceService.isStoreAvailable()) {

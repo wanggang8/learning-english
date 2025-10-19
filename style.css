@@ -934,3 +934,70 @@ body.fullscreen-active .container {
 @media (max-width: 768px) {
   .shp-row { grid-template-columns: 1fr; }
 }
+
+/* 拖拽上传覆盖层样式 */
+.drag-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.drag-overlay.visible {
+    display: flex;
+    animation: fadeIn 0.15s ease;
+}
+
+.drag-box {
+    pointer-events: none;
+    width: min(720px, 82vw);
+    background: linear-gradient(135deg, #fff 0%, #f7fbff 100%);
+    border: 5px dashed #ffd700;
+    border-radius: 20px;
+    text-align: center;
+    padding: 2.2rem 2rem;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.4),
+        inset 0 0 24px rgba(255, 255, 255, 0.6);
+    transform: scale(0.98);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    animation: borderPulse 1.6s ease-in-out infinite;
+}
+
+.drag-overlay.over .drag-box {
+    transform: scale(1.02);
+    border-color: #4d96ff;
+    box-shadow:
+        0 12px 48px rgba(77, 150, 255, 0.45),
+        inset 0 0 28px rgba(255, 255, 255, 0.7);
+}
+
+.drag-icon {
+    font-size: 3rem;
+    margin-bottom: 0.6rem;
+}
+
+.drag-text {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1e3a8a;
+    margin-bottom: 0.3rem;
+}
+
+.drag-subtext {
+    color: #444;
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+@keyframes borderPulse {
+    0%, 100% {
+        box-shadow: 0 10px 40px rgba(0,0,0,0.4), inset 0 0 20px rgba(255,255,255,0.55);
+    }
+    50% {
+        box-shadow: 0 12px 50px rgba(255,217,61,0.45), inset 0 0 30px rgba(255, 245, 200, 0.9);
+    }
+}

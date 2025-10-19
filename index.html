@@ -97,6 +97,15 @@
         <button class="music-toggle" onclick="toggleMusic()" id="musicBtn">🔊</button>
         <!-- 历史面板开关按钮 -->
         <button class="history-toggle" id="historyToggleBtn" title="历史面板 (H)">🕘</button>
+
+        <!-- 拖拽上传覆盖层 -->
+        <div id="dragOverlay" class="drag-overlay" aria-hidden="true">
+            <div class="drag-box">
+                <div class="drag-icon">📥</div>
+                <div class="drag-text">拖拽 Excel 文件到此处导入</div>
+                <div class="drag-subtext">支持 .xlsx/.xls；可同时拖入学生名单与单词列表</div>
+            </div>
+        </div>
     </div>
 
 </body>

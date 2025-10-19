@@ -929,6 +929,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 暴露全局函数
 Object.assign(window, {
+    // 数据与状态（供拖拽导入等模块复用）
+    setStudents,
+    setWords,
+    // 核心交互
     startDrawing,
     showWordInput,
     resetToStart,

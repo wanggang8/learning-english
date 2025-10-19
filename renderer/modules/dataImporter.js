@@ -335,6 +335,61 @@ function getImportStats() {
   };
 }
 
+// 文件类型检测辅助函数
+const HEADER_HINTS = {
+  students: ['姓名', 'name', 'student', '学生', 'student name', '同学'],
+  words: ['单词', 'word', 'vocabulary', '词汇', '词表', '英文', '英语']
+};
+
+const FILENAME_HINTS = {
+  students: ['student', 'students', 'stu', '名单', '学生', 'class', '班', '花名册', 'roster'],
+  words: ['word', 'words', 'vocabulary', 'vocab', '单词', '词汇', '词表', '英文', '英语']
+};
+
+function detectDataTypeFromHeaders(rawData) {
+  if (!Array.isArray(rawData) || rawData.length === 0) return null;
+  const headerRow = rawData[0];
+  if (!Array.isArray(headerRow)) return null;
+  const normalized = headerRow.map((cell) => (cell == null ? '' : String(cell).trim().toLowerCase()));
+  const containsAny = (tokens) => tokens.some((t) => normalized.some((h) => h.includes(String(t).toLowerCase())));
+  if (containsAny(HEADER_HINTS.students)) return DATA_TYPES.STUDENTS;
+  if (containsAny(HEADER_HINTS.words)) return DATA_TYPES.WORDS;
+  return null;
+}
+
+function detectDataTypeFromFilename(filename) {
+  if (!filename || typeof filename !== 'string') return null;
+  const name = filename.toLowerCase();
+  const hitStudents = FILENAME_HINTS.students.some((k) => name.includes(k.toLowerCase()));
+  const hitWords = FILENAME_HINTS.words.some((k) => name.includes(k.toLowerCase()));
+  if (hitStudents && !hitWords) return DATA_TYPES.STUDENTS;
+  if (hitWords && !hitStudents) return DATA_TYPES.WORDS;
+  return null; // 模糊或无法判断
+}
+
+async function detectFileType(file) {
+  const filename = file?.name || '';
+  try {
+    const arrayBuffer = await readFile(file);
+    const rawData = parseExcelData(arrayBuffer);
+    const typeFromHeader = detectDataTypeFromHeaders(rawData);
+    if (typeFromHeader) {
+      return { type: typeFromHeader, basis: 'header' };
+    }
+  } catch (e) {
+    const byName = detectDataTypeFromFilename(filename);
+    if (byName) {
+      return { type: byName, basis: 'filename', reason: `Excel 解析失败，基于文件名推断：${e?.message || ''}` };
+    }
+    return { type: 'unknown', basis: 'failed', reason: e?.message || '解析失败' };
+  }
+  const byName = detectDataTypeFromFilename(filename);
+  if (byName) {
+    return { type: byName, basis: 'filename' };
+  }
+  return { type: 'unknown', basis: 'unknown', reason: '未能从表头或文件名识别' };
+}
+
 // 导出模块
 window.DataImporter = Object.freeze({
   SOURCE_TYPES,
@@ -342,5 +397,6 @@ window.DataImporter = Object.freeze({
   importExcelFile,
   importTestData,
   importBothFiles,
-  getImportStats
+  getImportStats,
+  detectFileType
 });
