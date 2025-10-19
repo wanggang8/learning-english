@@ -163,10 +163,10 @@ npm run build:all
 - `data/` 目录用于存放 Excel 数据源（学生名单、单词列表）。
 - Electron 进程通过 `electron-store` 在本地持久化存储以下数据结构：
   - `students`：学生列表
-  - `words`：单词列表
+  - `words`：单词对象列表（Phase 2.1.1 起）：每项包含 { word, phonetic, definition, example, tags, imagePath, mastery, lastReviewedAt, favorite }
   - `settings`：应用设置（音乐开关、动画时长等）
-  - `sessionHistory`：历史抽取记录
-  - `metadata`：版本与修改时间信息
+  - `sessionHistory`：历史抽取记录（word 字段兼容 string 与对象）
+  - `metadata`：版本与修改时间信息（含 schemaVersion）
 - 预加载脚本（`preload.js`）通过 `contextBridge` 向渲染进程暴露 `window.store` API，渲染层可以通过 `services/persistence.js` 统一访问并处理错误。
 - 可通过 `window.PersistenceService.setErrorHandler(fn)` 注册统一错误提示钩子。
 

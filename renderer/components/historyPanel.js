@@ -150,8 +150,8 @@
       li.className = 'history-item';
       const time = formatTime(e.timestamp);
       const student = e.student || '——';
-      const word = e.word || '——';
-      li.innerHTML = `<span class="h-time">${time}</span><span class="h-name">${student}</span><span class="h-word">${word}</span>`;
+      const wordText = (e && e.word && typeof e.word === 'object') ? (e.word.word || '——') : (e.word || '——');
+      li.innerHTML = `<span class="h-time">${time}</span><span class="h-name">${student}</span><span class="h-word">${wordText}</span>`;
       list.appendChild(li);
     }
     return list;

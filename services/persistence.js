@@ -60,9 +60,77 @@ function execute(operation, handler, fallback) {
   }
 }
 
+// Normalization helpers for enriched word objects (backward compatible)
+const WORD_DEFAULTS = Object.freeze({
+  word: '',
+  phonetic: null,
+  definition: null,
+  example: null,
+  tags: [],
+  imagePath: null,
+  mastery: 0,
+  lastReviewedAt: null,
+  favorite: false
+});
+
+function normalizeWordEntry(entry) {
+  if (entry == null) return null;
+  if (typeof entry === 'string' || typeof entry === 'number') {
+    const w = String(entry).trim();
+    if (!w) return null;
+    return { ...WORD_DEFAULTS, word: w };
+  }
+  if (typeof entry === 'object') {
+    const base = { ...WORD_DEFAULTS };
+    const word =
+      typeof entry.word === 'string' ? entry.word
+      : typeof entry.text === 'string' ? entry.text
+      : typeof entry.value === 'string' ? entry.value
+      : typeof entry.term === 'string' ? entry.term
+      : '';
+    const normalized = {
+      ...base,
+      ...entry,
+      word: String(word || '').trim()
+    };
+    if (!Array.isArray(entry.tags)) {
+      normalized.tags = Array.isArray(entry.tags) ? entry.tags : [];
+    } else {
+      normalized.tags = entry.tags.filter((t) => t != null).map((t) => String(t));
+    }
+    const m = Number(entry.mastery);
+    normalized.mastery = Number.isFinite(m) ? m : 0;
+    if (normalized.lastReviewedAt != null) {
+      normalized.lastReviewedAt = String(normalized.lastReviewedAt);
+    } else {
+      normalized.lastReviewedAt = null;
+    }
+    normalized.favorite = Boolean(entry.favorite);
+    ['phonetic','definition','example','imagePath'].forEach((k)=>{
+      if (normalized[k] == null) normalized[k] = null; else normalized[k] = String(normalized[k]);
+    });
+    if (!normalized.word) return null;
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeWordsArray(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const item of list) {
+    const n = normalizeWordEntry(item);
+    if (n && n.word) out.push(n);
+  }
+  return out;
+}
+
 function getState() {
   return execute('getState', (api) => {
     const state = api.getState();
+    if (state && Array.isArray(state.words)) {
+      state.words = normalizeWordsArray(state.words);
+    }
     return {
       success: true,
       data: state
@@ -71,25 +139,34 @@ function getState() {
 }
 
 function setState(state) {
-  return execute('setState', (api) => api.setState(state));
+  return execute('setState', (api) => {
+    const next = (state && typeof state === 'object') ? { ...state } : state;
+    if (next && Array.isArray(next.words)) {
+      next.words = normalizeWordsArray(next.words);
+    }
+    return api.setState(next);
+  });
 }
 
 function updatePartial(updates) {
   return execute('updatePartial', (api) => {
-    if (updates.importMetadata && typeof updates.importMetadata === 'object') {
+    let patch = updates;
+    if (updates && updates.importMetadata && typeof updates.importMetadata === 'object') {
       const currentState = api.getState();
       const currentImportMetadata = currentState.importMetadata || { students: {}, words: {} };
       const mergedImportMetadata = {
         students: { ...currentImportMetadata.students, ...(updates.importMetadata.students || {}) },
         words: { ...currentImportMetadata.words, ...(updates.importMetadata.words || {}) }
       };
-      const mergedUpdates = {
+      patch = {
         ...updates,
         importMetadata: mergedImportMetadata
       };
-      return api.updatePartial(mergedUpdates);
     }
-    return api.updatePartial(updates);
+    if (patch && Array.isArray(patch.words)) {
+      patch = { ...patch, words: normalizeWordsArray(patch.words) };
+    }
+    return api.updatePartial(patch);
   });
 }
 
@@ -126,7 +203,7 @@ function updateSettings(newSettings) {
 function saveData(students, words) {
   return execute('saveData', () => updatePartial({
     students: Array.isArray(students) ? students : [],
-    words: Array.isArray(words) ? words : []
+    words: Array.isArray(words) ? normalizeWordsArray(words) : []
   }));
 }
 
@@ -140,7 +217,7 @@ function loadData() {
       success: true,
       data: {
         students: Array.isArray(result.data?.students) ? result.data.students : [],
-        words: Array.isArray(result.data?.words) ? result.data.words : []
+        words: Array.isArray(result.data?.words) ? normalizeWordsArray(result.data.words) : []
       }
     };
   });
