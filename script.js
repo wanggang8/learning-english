@@ -650,6 +650,10 @@ function toggleMusic() {
     setMusicEnabled(!audioState.musicEnabled);
 }
 
+function toggleFullscreen() {
+    try { window.AppCommands && window.AppCommands.fullscreenToggle && window.AppCommands.fullscreenToggle(); } catch (e) {}
+}
+
 // 清空历史确认弹窗
 function showClearHistoryDialog() {
     if (document.getElementById('clearHistoryModal')) return;
@@ -942,5 +946,6 @@ Object.assign(window, {
     resetSession,
     showNewSessionDialog,
     showFullResetDialog,
-    fullReset
+    fullReset,
+    toggleFullscreen
 });

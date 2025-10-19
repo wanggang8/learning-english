@@ -366,6 +366,41 @@ body {
     opacity: 0.5;
 }
 
+/* 全屏切换按钮 */
+.fullscreen-toggle {
+    position: fixed;
+    top: 20px;
+    right: 90px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: 3px solid #4d96ff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.fullscreen-toggle:hover { transform: scale(1.1); }
+.fullscreen-toggle.active { box-shadow: 0 0 0 4px rgba(77,150,255,0.3); }
+
+/* 全屏布局微调（去除多余边距，优化 16:9 区域） */
+body.fullscreen-active .main-content {
+    width: min(56vw, 900px);
+    margin-right: 6%;
+}
+body.fullscreen-active .character-image {
+    left: 3%;
+    width: min(40vw, 700px);
+    height: min(40vw, 700px);
+}
+body.fullscreen-active .container {
+    max-width: 100vw;
+    max-height: 100vh;
+}
+
 /* 模态框 */
 .modal {
     display: none;
