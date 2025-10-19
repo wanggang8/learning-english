@@ -1,5 +1,7 @@
 // AppCommands: 统一的指令入口，封装具体动作，确保按钮与快捷键调用链一致
 (function(){
+  let isWindowFullscreen = false;
+
   function getActiveScreenId() {
     const el = document.querySelector('.screen.active');
     return el ? el.id : null;
@@ -20,6 +22,28 @@
     } catch (e) {
       return true; // 忽略异常，交由具体动作自行校验
     }
+  }
+
+  function updateFullscreenUI(isFull) {
+    isWindowFullscreen = !!isFull;
+    try { document.body.classList.toggle('fullscreen-active', !!isFull); } catch (e) {}
+    const btn = document.getElementById('fullscreenBtn');
+    if (btn) {
+      btn.textContent = isFull ? '🗗' : '🗖';
+      btn.title = isFull ? '退出全屏 (Esc)' : '全屏 (F11)';
+      btn.classList.toggle('active', !!isFull);
+    }
+  }
+
+  function setupFullscreenListeners() {
+    try {
+      if (window.windowControls && typeof window.windowControls.onFullscreenChanged === 'function') {
+        window.windowControls.onFullscreenChanged(updateFullscreenUI);
+        if (typeof window.windowControls.isFullscreen === 'function') {
+          window.windowControls.isFullscreen().then(updateFullscreenUI).catch(() => {});
+        }
+      }
+    } catch (e) {}
   }
 
   function drawStart() {
@@ -74,6 +98,13 @@
     try { window.ShortcutHelp && window.ShortcutHelp.toggle && window.ShortcutHelp.toggle(); } catch (e) {}
   }
 
+  function fullscreenToggle() {
+    try { window.windowControls && window.windowControls.toggleFullscreen && window.windowControls.toggleFullscreen(); } catch (e) {}
+  }
+  function fullscreenExit() {
+    try { window.windowControls && window.windowControls.exitFullscreen && window.windowControls.exitFullscreen(); } catch (e) {}
+  }
+
   function exitFullscreenIfAny() {
     const el = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
     if (el) {
@@ -86,6 +117,7 @@
   }
 
   function backOrExitFullscreen() {
+    if (isWindowFullscreen) { fullscreenExit(); return; }
     if (exitFullscreenIfAny()) return;
     // 优先关闭帮助/历史
     helpClose();
@@ -105,8 +137,17 @@
     helpOpen,
     helpClose,
     helpToggle,
+    fullscreenToggle,
+    fullscreenExit,
     backOrExitFullscreen
   });
+
+  // 初始化全屏事件同步
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFullscreenListeners);
+  } else {
+    setupFullscreenListeners();
+  }
 
   // 同时订阅事件总线（如有）
   if (window.AppEvents) {

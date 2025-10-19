@@ -8,6 +8,7 @@
     R: 'draw.redo',
     h: 'history.toggle',
     H: 'history.toggle',
+    F11: 'window.fullscreenToggle',
     Escape: 'ui.backOrExit',
     F1: 'help.toggle',
     '?': 'help.open'
@@ -75,6 +76,8 @@
         return window.AppCommands?.helpToggle?.();
       case 'ui.backOrExit':
         return window.AppCommands?.backOrExitFullscreen?.();
+      case 'window.fullscreenToggle':
+        return window.AppCommands?.fullscreenToggle?.();
       default:
         // 支持通过事件总线触发自定义命令
         if (window.AppEvents) {
@@ -104,8 +107,8 @@
     const action = map[keyNorm];
     if (!action) return;
 
-    // 阻止默认，如 F1 的浏览器帮助
-    if (keyNorm === 'F1' || keyNorm === 'Space') {
+    // 阻止默认，如 F1 的浏览器帮助、F11 的默认全屏
+    if (keyNorm === 'F1' || keyNorm === 'Space' || keyNorm === 'F11') {
       e.preventDefault();
     }
 
