@@ -628,6 +628,8 @@ function persistCurrentDrawEvent() {
         const result = window.PersistenceService.addSessionHistory(entry);
         if (!result.success) {
             console.warn('保存抽取历史失败:', result.error);
+        } else {
+            try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
         }
     } catch (e) {
         console.warn('保存抽取历史异常:', e);
@@ -677,6 +679,7 @@ function showClearHistoryDialog() {
             const result = window.PersistenceService?.clearHistory({ scope: 'current' });
             if (result && result.success) {
                 window.Feedback?.showSuccess('已清空当前会话历史');
+                try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
             } else if (result && !result.success) {
                 window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
             }
@@ -692,6 +695,7 @@ function showClearHistoryDialog() {
             const result = window.PersistenceService?.clearHistory({ scope: 'all' });
             if (result && result.success) {
                 window.Feedback?.showSuccess('已清空全部历史');
+                try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
             } else if (result && !result.success) {
                 window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
             }
