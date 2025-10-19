@@ -720,3 +720,146 @@ body {
         padding: 0.8rem 1rem;
     }
 }
+
+/* 历史面板与开关 */
+.history-toggle {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: 3px solid #6bcf7f;
+    font-size: 1.4rem;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.history-toggle:hover { transform: scale(1.08); }
+.history-toggle.active { box-shadow: 0 0 0 4px rgba(107,207,127,0.3); }
+
+.history-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 360px;
+    max-width: 85vw;
+    background: linear-gradient(135deg, #fff 0%, #f7fff9 100%);
+    border-right: 4px solid #6bcf7f;
+    box-shadow: 8px 0 30px rgba(0,0,0,0.35);
+    z-index: 1200;
+    transform: translateX(-110%);
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.history-panel.visible { transform: translateX(0); }
+
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 12px 8px 14px;
+    border-bottom: 2px dashed #a7e6b5;
+}
+
+.history-title { font-weight: bold; color: #2e7d32; }
+.history-actions { display: flex; align-items: center; gap: 8px; }
+.history-summary { padding: 8px 14px; font-size: 0.95rem; color: #2e7d32; }
+
+.history-content {
+    padding: 6px 8px 10px 8px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.history-footer {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.6);
+}
+
+.hp-sort-btn {
+    background: #e8f8ec;
+    border: 2px solid #6bcf7f;
+    color: #2e7d32;
+    border-radius: 10px;
+    padding: 4px 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.hp-sort-btn.active {
+    background: #6bcf7f;
+    color: white;
+    box-shadow: 0 0 0 3px rgba(107,207,127,0.25);
+}
+
+.hp-clear-btn, .hp-close-btn {
+    background: #fff;
+    border: 2px solid #ddd;
+    color: #333;
+    border-radius: 10px;
+    padding: 4px 10px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.hp-clear-btn:hover { border-color: #ff6b9d; color: #d32f2f; }
+.hp-close-btn:hover { border-color: #999; }
+
+.history-list { list-style: none; }
+.history-item {
+    display: grid;
+    grid-template-columns: 80px 1fr 1fr;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px dashed #e0f2e9;
+}
+.history-item .h-time { color: #558b2f; font-family: monospace; }
+.history-item .h-name { font-weight: bold; color: #2e7d32; }
+.history-item .h-word { color: #37474f; }
+
+/* 次数模式的徽章 */
+.h-badge {
+    display: inline-block;
+    min-width: 26px;
+    text-align: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #ffd93d;
+    color: #333;
+    font-weight: bold;
+    border: 2px solid #fff2ac;
+    justify-self: start;
+}
+
+/* 统计模式布局：name | count | last time */
+.count-mode-list .history-item { grid-template-columns: 1fr 60px 80px; }
+
+.history-empty {
+    padding: 16px 12px;
+    color: #666;
+}
+
+/* 小屏适配 */
+@media (max-width: 768px) {
+    .history-toggle {
+        top: auto;
+        bottom: 20px;
+        left: 20px;
+        width: 52px; height: 52px;
+    }
+    .history-panel {
+        width: 90vw;
+        max-width: 90vw;
+    }
+}
