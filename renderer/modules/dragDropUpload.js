@@ -125,6 +125,9 @@
         const tipType = type === window.DataImporter.DATA_TYPES.STUDENTS ? '学生' : '单词';
         const suffix = ignoredCount > 0 ? `（已忽略 ${ignoredCount} 个额外文件）` : '';
         window.Feedback?.showSuccess(`✅ 已导入${tipType}：${res.count} ${suffix}`);
+        if (Array.isArray(res.warnings) && res.warnings.length) {
+          window.Feedback?.showWarning(`注意：\n${res.warnings.join('\n')}`);
+        }
       } else {
         window.Feedback?.showError(`❌ 导入失败：${res?.error || '未知错误'}`);
       }
@@ -146,6 +149,9 @@
         let msg = `✅ 数据已自动保存！\n学生: ${results.students?.count || 0} 名\n单词: ${results.words?.count || 0} 个`;
         if (ignoredCount > 0) msg += `\n已忽略 ${ignoredCount} 个额外文件`;
         window.Feedback?.showSuccess(msg);
+        if (Array.isArray(results?.warnings) && results.warnings.length) {
+          window.Feedback?.showWarning(`注意：\n${results.warnings.join('\n')}`);
+        }
       } else {
         const errorMsg = Array.isArray(results?.errors) && results.errors.length ? results.errors.join('\n') : '导入失败';
         window.Feedback?.showError(`❌ 导入失败：\n${errorMsg}`);
