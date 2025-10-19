@@ -410,7 +410,20 @@ async function loadBothExcelFiles() {
     }
 
     try {
-        const results = await window.DataImporter.importBothFiles(studentsFile, wordsFile);
+        const task = async () => {
+            const results = await window.DataImporter.importBothFiles(studentsFile, wordsFile, (p) => {
+                try {
+                    if (typeof p?.progress === 'number') window.LoadingOverlay?.setProgress(p.progress);
+                    const msg = p?.message || '正在导入 2 个文件...';
+                    window.LoadingOverlay?.setMessage(msg);
+                } catch (_) {}
+            });
+            return results;
+        };
+
+        const results = window.LoadingOverlay
+            ? await window.LoadingOverlay.run(task, { message: '正在导入 2 个文件...', determinate: true })
+            : await task();
 
         if (results.success) {
             if (results.students?.success) {
@@ -504,6 +517,14 @@ function startDrawing() {
         return;
     }
 
+    const startBtn = document.querySelector('#startScreen .btn-primary');
+    if (startBtn && startBtn.disabled) return; // 防止重复点击
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.classList.add('loading');
+        startBtn.textContent = '抽取中...';
+    }
+
     switchScreen('drawingScreen');
 
     const rollingNameEl = document.getElementById('rollingName');
@@ -547,6 +568,12 @@ function startDrawing() {
             window.Feedback?.showToast('🎉 本轮所有学生已抽完！可选择“重新开始本轮”继续', window.Feedback.TOAST_TYPES.INFO, 4500);
         }
         switchScreen('resultScreen');
+
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.classList.remove('loading');
+            startBtn.textContent = '开始冒险';
+        }
     }, 2000);
 }
 
@@ -556,6 +583,14 @@ function showWordInput() {
         return;
     }
 
+    const drawBtn = document.querySelector('#resultScreen .btn-secondary');
+    if (drawBtn && drawBtn.disabled) return; // 防止连续点击
+    if (drawBtn) {
+        drawBtn.disabled = true;
+        drawBtn.classList.add('loading');
+        drawBtn.textContent = '抽取中...';
+    }
+
     const randomIndex = Math.floor(Math.random() * availableWords.length);
     selectedWord = availableWords[randomIndex];
     availableWords.splice(randomIndex, 1);
@@ -563,6 +598,15 @@ function showWordInput() {
     displayWord(selectedWord);
     // 记录并持久化本次抽取
     persistCurrentDrawEvent();
+
+    // 短暂延迟后恢复按钮状态（避免重复触发）
+    setTimeout(() => {
+        if (drawBtn) {
+            drawBtn.disabled = false;
+            drawBtn.classList.remove('loading');
+            drawBtn.textContent = '抽取单词';
+        }
+    }, 300);
 }
 
 function displayWord(word) {
@@ -648,33 +692,55 @@ function showClearHistoryDialog() {
         modal.remove();
     };
 
-    document.getElementById('clearCurrentSessionBtn')?.addEventListener('click', () => {
-        try {
-            const result = window.PersistenceService?.clearHistory({ scope: 'current' });
-            if (result && result.success) {
-                window.Feedback?.showSuccess('已清空当前会话历史');
-                try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
-            } else if (result && !result.success) {
-                window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
+    document.getElementById('clearCurrentSessionBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('clearCurrentSessionBtn');
+        if (btn) { btn.disabled = true; btn.classList.add('loading'); btn.textContent = '处理中...'; }
+        const task = async () => {
+            try {
+                const result = window.PersistenceService?.clearHistory({ scope: 'current' });
+                if (result && result.success) {
+                    window.Feedback?.showSuccess('已清空当前会话历史');
+                    try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
+                } else if (result && !result.success) {
+                    window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
+                }
+            } catch (e) {
+                window.Feedback?.showError(`清空失败：${e.message}`);
             }
-        } catch (e) {
-            window.Feedback?.showError(`清空失败：${e.message}`);
+        };
+        try {
+            if (window.LoadingOverlay) {
+                await window.LoadingOverlay.run(task, { message: '正在清空当前会话历史...', determinate: false });
+            } else {
+                await task();
+            }
         } finally {
             cleanup();
         }
     });
 
-    document.getElementById('clearAllHistoryBtn')?.addEventListener('click', () => {
-        try {
-            const result = window.PersistenceService?.clearHistory({ scope: 'all' });
-            if (result && result.success) {
-                window.Feedback?.showSuccess('已清空全部历史');
-                try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
-            } else if (result && !result.success) {
-                window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
+    document.getElementById('clearAllHistoryBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('clearAllHistoryBtn');
+        if (btn) { btn.disabled = true; btn.classList.add('loading'); btn.textContent = '处理中...'; }
+        const task = async () => {
+            try {
+                const result = window.PersistenceService?.clearHistory({ scope: 'all' });
+                if (result && result.success) {
+                    window.Feedback?.showSuccess('已清空全部历史');
+                    try { window.HistoryPanel && window.HistoryPanel.refresh && window.HistoryPanel.refresh(); } catch (e) {}
+                } else if (result && !result.success) {
+                    window.Feedback?.showError(`清空失败：${result.error || '未知错误'}`);
+                }
+            } catch (e) {
+                window.Feedback?.showError(`清空失败：${e.message}`);
             }
-        } catch (e) {
-            window.Feedback?.showError(`清空失败：${e.message}`);
+        };
+        try {
+            if (window.LoadingOverlay) {
+                await window.LoadingOverlay.run(task, { message: '正在清空全部历史...', determinate: false });
+            } else {
+                await task();
+            }
         } finally {
             cleanup();
         }
@@ -816,9 +882,19 @@ function showNewSessionDialog() {
     `;
     document.body.appendChild(modal);
     const cleanup = () => { modal.remove(); };
-    document.getElementById('confirmNewSessionBtn')?.addEventListener('click', () => {
-        resetSession();
-        cleanup();
+    document.getElementById('confirmNewSessionBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('confirmNewSessionBtn');
+        if (btn) { btn.disabled = true; btn.classList.add('loading'); btn.textContent = '处理中...'; }
+        const task = async () => { try { resetSession(); } catch (e) {} };
+        try {
+            if (window.LoadingOverlay) {
+                await window.LoadingOverlay.run(task, { message: '正在开始新会话...', determinate: false });
+            } else {
+                await task();
+            }
+        } finally {
+            cleanup();
+        }
     });
     document.getElementById('cancelNewSessionBtn')?.addEventListener('click', cleanup);
 }
@@ -841,9 +917,19 @@ function showFullResetDialog() {
     `;
     document.body.appendChild(modal);
     const cleanup = () => { modal.remove(); };
-    document.getElementById('confirmFullResetBtn')?.addEventListener('click', () => {
-        fullReset();
-        cleanup();
+    document.getElementById('confirmFullResetBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('confirmFullResetBtn');
+        if (btn) { btn.disabled = true; btn.classList.add('loading'); btn.textContent = '处理中...'; }
+        const task = async () => { try { fullReset(); } catch (e) {} };
+        try {
+            if (window.LoadingOverlay) {
+                await window.LoadingOverlay.run(task, { message: '正在完全重置...', determinate: false });
+            } else {
+                await task();
+            }
+        } finally {
+            cleanup();
+        }
     });
     document.getElementById('cancelFullResetBtn')?.addEventListener('click', cleanup);
 }

@@ -114,15 +114,39 @@
 
   async function importSingle(file, type, ignoredCount = 0) {
     if (!file || !type) return;
+    const tipType = type === window.DataImporter.DATA_TYPES.STUDENTS ? '学生' : '单词';
     try {
-      const res = await window.DataImporter.importExcelFile(file, type);
+      const task = async () => {
+        const res = await window.DataImporter.importExcelFile(file, type, (p) => {
+          try {
+            const msg = (() => {
+              switch (p?.phase) {
+                case 'read': return `正在读取${tipType}文件...`;
+                case 'parse-start':
+                case 'parse': return `正在解析${tipType}数据...`;
+                case 'validate': return `正在校验${tipType}数据...`;
+                case 'save': return `正在保存${tipType}数据...`;
+                case 'done': return `${tipType}导入完成`;
+                default: return `正在导入${tipType}...`;
+              }
+            })();
+            if (typeof p?.progress === 'number') window.LoadingOverlay?.setProgress(p.progress);
+            window.LoadingOverlay?.setMessage(msg);
+          } catch (_) {}
+        });
+        return res;
+      };
+
+      const res = window.LoadingOverlay
+        ? await window.LoadingOverlay.run(task, { message: `正在导入${tipType}...`, determinate: true })
+        : await task();
+
       if (res && res.success) {
         if (type === window.DataImporter.DATA_TYPES.STUDENTS) {
           try { window.setStudents && window.setStudents(res.data); } catch (e) {}
         } else if (type === window.DataImporter.DATA_TYPES.WORDS) {
           try { window.setWords && window.setWords(res.data); } catch (e) {}
         }
-        const tipType = type === window.DataImporter.DATA_TYPES.STUDENTS ? '学生' : '单词';
         const suffix = ignoredCount > 0 ? `（已忽略 ${ignoredCount} 个额外文件）` : '';
         window.Feedback?.showSuccess(`✅ 已导入${tipType}：${res.count} ${suffix}`);
         if (Array.isArray(res.warnings) && res.warnings.length) {
@@ -138,7 +162,21 @@
 
   async function importBoth(studentsFile, wordsFile, ignoredCount = 0) {
     try {
-      const results = await window.DataImporter.importBothFiles(studentsFile, wordsFile);
+      const task = async () => {
+        const results = await window.DataImporter.importBothFiles(studentsFile, wordsFile, (p) => {
+          try {
+            if (typeof p?.progress === 'number') window.LoadingOverlay?.setProgress(p.progress);
+            const msg = p?.message || '正在导入 2 个文件...';
+            window.LoadingOverlay?.setMessage(msg);
+          } catch (_) {}
+        });
+        return results;
+      };
+
+      const results = window.LoadingOverlay
+        ? await window.LoadingOverlay.run(task, { message: '正在导入 2 个文件...', determinate: true })
+        : await task();
+
       if (results && results.success) {
         if (results.students?.success) {
           try { window.setStudents && window.setStudents(results.students.data); } catch (e) {}
