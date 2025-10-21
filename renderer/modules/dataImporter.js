@@ -123,6 +123,16 @@ function validateAndCleanData(rawData, dataType) {
   let invalidRows = 0;
   let duplicateCount = 0;
 
+  // 针对单词表，识别图片列（可选）
+  let imgCol = -1;
+  if (needWords) {
+    try {
+      const hdrs = header.map((h) => (h == null ? '' : String(h).trim().toLowerCase()));
+      const imgTokens = ['图片', 'image', 'img', 'image path', '图片路径'];
+      imgCol = hdrs.findIndex((h) => imgTokens.some((t) => h.includes(t.toLowerCase())));
+    } catch (_) { imgCol = -1; }
+  }
+
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
     if (!Array.isArray(row)) { invalidRows++; continue; }
@@ -135,7 +145,20 @@ function validateAndCleanData(rawData, dataType) {
 
     if (seen.has(value)) { duplicateCount++; continue; }
     seen.add(value);
-    cleaned.push(value);
+
+    if (needWords) {
+      const entry = { word: value };
+      if (imgCol >= 0) {
+        const imgRef = row[imgCol];
+        if (imgRef != null && imgRef !== '') {
+          const s = String(imgRef).trim();
+          if (s) entry.imagePath = s; // 暂存原始引用，后续归一化
+        }
+      }
+      cleaned.push(entry);
+    } else {
+      cleaned.push(value);
+    }
   }
 
   if (cleaned.length === 0) {
@@ -256,7 +279,18 @@ async function importExcelFile(file, dataType, onProgress) {
         data: []
       };
     }
-    try { onProgress && onProgress({ phase: 'validate', progress: 0.75, message: '校验完成，正在保存...' }); } catch (_) {}
+
+    // 3.5 若为单词表，解析并复制图片资源
+    let finalData = validation.data;
+    const warnings = Array.isArray(validation.warnings) ? validation.warnings.slice() : [];
+    if (dataType === DATA_TYPES.WORDS) {
+      try { onProgress && onProgress({ phase: 'assets', progress: 0.8, message: '正在处理图片资源...' }); } catch (_) {}
+      const res = await normalizeWordImages(finalData);
+      finalData = res.list;
+      if (Array.isArray(res.warnings) && res.warnings.length) warnings.push(...res.warnings);
+    }
+
+    try { onProgress && onProgress({ phase: 'validate', progress: 0.9, message: '校验完成，正在保存...' }); } catch (_) {}
 
     // 4. 保存到存储
     const metadata = {
@@ -265,19 +299,19 @@ async function importExcelFile(file, dataType, onProgress) {
       sourceType: SOURCE_TYPES.EXCEL
     };
 
-    try { onProgress && onProgress({ phase: 'save', progress: 0.9, message: '正在保存...' }); } catch (_) {}
-    await saveToStore(validation.data, dataType, metadata);
+    try { onProgress && onProgress({ phase: 'save', progress: 0.95, message: '正在保存...' }); } catch (_) {}
+    await saveToStore(finalData, dataType, metadata);
 
-    console.log(`${MODULE_NAME} 成功导入 ${dataType}:`, validation.count);
+    console.log(`${MODULE_NAME} 成功导入 ${dataType}:`, Array.isArray(finalData) ? finalData.length : 0);
 
     try { onProgress && onProgress({ phase: 'done', progress: 1, message: '完成' }); } catch (_) {}
 
     return {
       success: true,
-      data: validation.data,
-      count: validation.count,
+      data: finalData,
+      count: Array.isArray(finalData) ? finalData.length : 0,
       filename: file.name,
-      warnings: validation.warnings || []
+      warnings
     };
 
   } catch (error) {
@@ -288,6 +322,62 @@ async function importExcelFile(file, dataType, onProgress) {
       data: []
     };
   }
+}
+
+/**
+ * 规范化单词对象中的图片字段：
+ * - 本地路径通过 AssetService 复制到 assets/user 并返回相对路径
+ * - 远程 URL 原样保留（提示离线不可用）
+ * - 已在 assets/ 下的路径原样保留
+ */
+async function normalizeWordImages(list) {
+  if (!Array.isArray(list)) return { list: [], warnings: [] };
+  const out = [];
+  const warnings = [];
+  const offlineWarned = new Set();
+
+  const isHttp = (s) => /^https?:\/\//i.test(s);
+  const isAssetsPath = (s) => /^assets\//i.test(s);
+
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object') { continue; }
+    const cur = { ...entry };
+    const raw = typeof cur.imagePath === 'string' ? cur.imagePath.trim() : '';
+    if (raw) {
+      if (isAssetsPath(raw)) {
+        // 已经是 assets 内部资源
+        cur.imagePath = raw.replace(/\\/g, '/');
+      } else if (isHttp(raw)) {
+        cur.imagePath = raw;
+        if (!offlineWarned.has('remote')) {
+          warnings.push('检测到远程图片 URL，离线模式下可能无法显示');
+          offlineWarned.add('remote');
+        }
+      } else if (window.AssetService && typeof window.AssetService.copyImage === 'function') {
+        try {
+          const res = await window.AssetService.copyImage(raw);
+          if (res && res.success && res.url) {
+            cur.imagePath = res.url;
+          } else {
+            cur.imagePath = null;
+            warnings.push(`图片未找到或无法复制：${raw}`);
+          }
+        } catch (e) {
+          cur.imagePath = null;
+          warnings.push(`图片处理失败：${raw}`);
+        }
+      } else {
+        // 资源服务不可用，保留原始值但提示
+        warnings.push('图片资源服务不可用，已保留原始路径，可能无法访问');
+        cur.imagePath = raw;
+      }
+    } else {
+      cur.imagePath = null;
+    }
+    out.push(cur);
+  }
+
+  return { list: out, warnings };
 }
 
 /**
