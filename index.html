@@ -77,6 +77,15 @@
                         <button class="btn-primary" id="fcFlipBtn">翻面 (Space)</button>
                         <button class="btn-secondary" id="fcNextBtn">下一张 ➡</button>
                     </div>
+                    <div class="fc-actions" id="fcActions">
+                        <button id="fcFavBtn" class="fc-fav-btn" title="收藏">☆</button>
+                        <div class="fc-mastery" id="fcMastery">
+                            <button class="fc-m-btn" id="fcM0" data-level="0">M0</button>
+                            <button class="fc-m-btn" id="fcM1" data-level="1">M1</button>
+                            <button class="fc-m-btn" id="fcM2" data-level="2">M2</button>
+                            <button class="fc-m-btn" id="fcM3" data-level="3">M3</button>
+                        </div>
+                    </div>
                     <div class="fc-prefs">
                         <label>排列
                             <select id="fcOrderSelect">
@@ -91,9 +100,32 @@
                             </select>
                         </label>
                         <label class="fc-checkbox"><input type="checkbox" id="fcIncludeImages" checked> 显示图片</label>
+                        <label>筛选
+                            <select id="fcFilterMode">
+                                <option value="all">全部</option>
+                                <option value="favorites">收藏</option>
+                                <option value="mastery">掌握度</option>
+                            </select>
+                        </label>
+                        <span class="fc-filter-range" id="fcFilterRange">
+                            <select id="fcFilterMin">
+                                <option value="0">0</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                            <span class="fc-range-sep">~</span>
+                            <select id="fcFilterMax">
+                                <option value="0">0</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                        </span>
                     </div>
+                    <div class="fc-summary" id="fcSummary"></div>
                     <div class="fc-footer">
-                        <button class="btn-back" onclick="resetToStart()">返回</button>
+                        <button class="btn-back" onclick="window.AppCommands?.uiBack?.()">返回</button>
                     </div>
                 </div>
             </div>
