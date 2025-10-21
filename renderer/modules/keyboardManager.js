@@ -4,6 +4,8 @@
 
   const DEFAULT_MAP = Object.freeze({
     Space: 'primary', // 按当前上下文触发主要动作
+    ArrowLeft: 'flashcard.prev',
+    ArrowRight: 'flashcard.next',
     r: 'draw.redo',
     R: 'draw.redo',
     h: 'history.toggle',
@@ -57,6 +59,8 @@
         return window.AppCommands?.wordShow?.();
       case 'wordScreen':
         return window.AppCommands?.uiBack?.();
+      case 'flashcardScreen':
+        return window.AppCommands?.flashcardFlip?.();
       default:
         return; // drawingScreen 或未知状态不处理
     }
@@ -78,6 +82,10 @@
         return window.AppCommands?.backOrExitFullscreen?.();
       case 'window.fullscreenToggle':
         return window.AppCommands?.fullscreenToggle?.();
+      case 'flashcard.prev':
+        return window.AppCommands?.flashcardPrev?.();
+      case 'flashcard.next':
+        return window.AppCommands?.flashcardNext?.();
       default:
         // 支持通过事件总线触发自定义命令
         if (window.AppEvents) {

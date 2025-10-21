@@ -1057,3 +1057,80 @@ button:disabled,
     cursor: not-allowed;
     filter: grayscale(10%);
 }
+
+/* =====================
+   Flashcard 组件样式
+   ===================== */
+.flashcard-container {
+    perspective: 1000px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 1.2rem 0 0.6rem 0;
+}
+
+.flashcard {
+    width: min(560px, 80%);
+    height: 340px;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s ease;
+    margin: 0 auto;
+}
+
+.flashcard .face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    background: linear-gradient(135deg, #fff 0%, #f6faff 100%);
+    border: 6px solid #4d96ff;
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), inset 0 0 26px rgba(255,255,255,0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.2rem 1.4rem;
+}
+
+.flashcard .front {
+    background: linear-gradient(135deg, #fff 0%, #fff5e6 100%);
+    border-color: #ffd93d;
+}
+
+.flashcard .back {
+    transform: rotateY(180deg);
+}
+
+.flashcard.flipped { transform: rotateY(180deg); }
+
+.fc-word {
+    font-size: 3rem;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    font-weight: bold;
+    background: linear-gradient(45deg, #ff6b9d, #ffd93d, #6bcf7f, #4d96ff);
+    background-size: 300% 300%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rainbowText 6s ease infinite;
+    margin-bottom: 0.4rem;
+}
+
+.fc-phonetic { color: #666; font-size: 1.2rem; margin-top: 0.3rem; }
+
+.fc-definition { color: #1f2937; font-size: 1.2rem; margin-bottom: 0.5rem; text-align: center; }
+.fc-example { color: #334155; font-style: italic; font-size: 1rem; opacity: 0.9; text-align: center; }
+
+.fc-image { max-width: 80%; max-height: 46%; border-radius: 10px; border: 3px solid #ffd700; margin-top: 0.6rem; display: none; }
+
+.flashcard-toolbar { display: grid; gap: 0.6rem; justify-items: center; margin-top: 0.4rem; }
+.fc-status { color: #fff; font-weight: bold; }
+.fc-controls { display: flex; gap: 0.6rem; }
+.fc-prefs { display: flex; gap: 0.8rem; align-items: center; color: #fff; flex-wrap: wrap; justify-content: center; }
+.fc-prefs select { padding: 0.25rem 0.45rem; border: 2px solid #ffd700; border-radius: 8px; }
+.fc-checkbox { user-select: none; }
+
+@media (max-width: 768px) {
+  .flashcard { width: 90%; height: 280px; }
+  .fc-word { font-size: 2.2rem; }
+}

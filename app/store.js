@@ -10,7 +10,12 @@ const DEFAULT_STATE = {
     lastUpdated: null,
     volume: 1,
     playMode: 'loop',
-    drawMode: 'random'
+    drawMode: 'random',
+    flashcard: {
+      order: 'shuffled',
+      defaultFace: 'front',
+      includeImages: true
+    }
   },
   // 会话历史：区分活动会话与归档会话
   sessionHistory: {
@@ -116,6 +121,16 @@ const schema = {
       drawMode: {
         type: 'string',
         default: 'random'
+      },
+      flashcard: {
+        type: 'object',
+        default: DEFAULT_STATE.settings.flashcard,
+        properties: {
+          order: { type: 'string', default: 'shuffled' },
+          defaultFace: { type: 'string', default: 'front' },
+          includeImages: { type: 'boolean', default: true }
+        },
+        additionalProperties: true
       }
     },
     additionalProperties: false
