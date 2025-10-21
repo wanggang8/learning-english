@@ -23,8 +23,8 @@ const DEFAULT_STATE = {
   },
   metadata: {
     lastModified: null,
-    version: '1.1.4',
-    schemaVersion: 2
+    version: '2.1.1',
+    schemaVersion: 3
   },
   importMetadata: {
     students: {
@@ -57,7 +57,20 @@ const schema = {
     type: 'array',
     default: [],
     items: {
-      type: 'string'
+      type: ['object', 'string'],
+      properties: {
+        word: { type: 'string' },
+        phonetic: { type: ['string', 'null'], default: null },
+        definition: { type: ['string', 'null'], default: null },
+        example: { type: ['string', 'null'], default: null },
+        tags: { type: 'array', default: [], items: { type: 'string' } },
+        imagePath: { type: ['string', 'null'], default: null },
+        mastery: { type: 'number', default: 0 },
+        lastReviewedAt: { type: ['string', 'null'], default: null },
+        favorite: { type: 'boolean', default: false }
+      },
+      required: ['word'],
+      additionalProperties: true
     }
   },
   studentStats: {
@@ -125,7 +138,7 @@ const schema = {
               properties: {
                 timestamp: { type: 'string' },
                 student: { type: ['string', 'null'], default: null },
-                word: { type: ['string', 'null'], default: null },
+                word: { type: ['string', 'object', 'null'], default: null },
                 fairness: {
                   type: ['object', 'null'],
                   default: null,
@@ -162,7 +175,7 @@ const schema = {
                 properties: {
                   timestamp: { type: 'string' },
                   student: { type: ['string', 'null'], default: null },
-                  word: { type: ['string', 'null'], default: null },
+                  word: { type: ['string', 'object', 'null'], default: null },
                   fairness: {
                     type: ['object', 'null'],
                     default: null,
@@ -198,11 +211,11 @@ const schema = {
       },
       version: {
         type: 'string',
-        default: '1.0.0'
+        default: '2.1.1'
       },
       schemaVersion: {
         type: 'number',
-        default: 1
+        default: 3
       }
     },
     additionalProperties: true
@@ -289,6 +302,105 @@ function getDefaultValue(key) {
   return clone(DEFAULT_STATE[key]);
 }
 
+// Schema migration constants and helpers for enriched word objects
+const CURRENT_SCHEMA_VERSION = 3;
+
+const WORD_DEFAULTS = Object.freeze({
+  word: '',
+  phonetic: null,
+  definition: null,
+  example: null,
+  tags: [],
+  imagePath: null,
+  mastery: 0,
+  lastReviewedAt: null,
+  favorite: false
+});
+
+function normalizeWordEntry(entry) {
+  if (entry == null) return null;
+  if (typeof entry === 'string' || typeof entry === 'number') {
+    const w = String(entry).trim();
+    if (!w) return null;
+    return { ...WORD_DEFAULTS, word: w };
+  }
+  if (typeof entry === 'object') {
+    const base = { ...WORD_DEFAULTS };
+    const word =
+      typeof entry.word === 'string' ? entry.word
+      : typeof entry.text === 'string' ? entry.text
+      : typeof entry.value === 'string' ? entry.value
+      : typeof entry.term === 'string' ? entry.term
+      : '';
+    const normalized = {
+      ...base,
+      ...entry,
+      word: String(word || '').trim()
+    };
+    // normalize tags
+    if (!Array.isArray(entry.tags)) {
+      normalized.tags = Array.isArray(entry.tags) ? entry.tags : [];
+    } else {
+      normalized.tags = entry.tags.filter((t) => t != null).map((t) => String(t));
+    }
+    // coerce mastery
+    const m = Number(entry.mastery);
+    normalized.mastery = Number.isFinite(m) ? m : 0;
+    // lastReviewedAt as string or null
+    if (normalized.lastReviewedAt != null) {
+      normalized.lastReviewedAt = String(normalized.lastReviewedAt);
+    } else {
+      normalized.lastReviewedAt = null;
+    }
+    // favorite boolean
+    normalized.favorite = Boolean(entry.favorite);
+    // normalize optional string fields
+    ['phonetic', 'definition', 'example', 'imagePath'].forEach((k) => {
+      if (normalized[k] == null) normalized[k] = null;
+      else normalized[k] = String(normalized[k]);
+    });
+    if (!normalized.word) {
+      return null;
+    }
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeWordsArray(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const item of list) {
+    const n = normalizeWordEntry(item);
+    if (n && n.word) {
+      out.push(n);
+    }
+  }
+  return out;
+}
+
+function migrateWordsIfNeeded() {
+  try {
+    const raw = store.get('words', getDefaultValue('words'));
+    const normalized = normalizeWordsArray(raw);
+    const need = !Array.isArray(raw)
+      || raw.length !== normalized.length
+      || raw.some((it) => typeof it === 'string' || typeof it === 'number' || (typeof it === 'object' && (it.word == null || it.phonetic === undefined || it.mastery === undefined || it.favorite === undefined)));
+    if (need) {
+      store.set('words', normalized);
+      const meta = store.get('metadata', getDefaultValue('metadata'));
+      const nextMeta = {
+        ...meta,
+        schemaVersion: Math.max(Number(meta?.schemaVersion || 1), CURRENT_SCHEMA_VERSION),
+        lastModified: new Date().toISOString()
+      };
+      store.set('metadata', nextMeta);
+    }
+  } catch (e) {
+    console.warn('words 迁移失败:', e);
+  }
+}
+
 function createFallbackStore() {
   const state = getDefaultState();
 
@@ -333,6 +445,9 @@ function createStore() {
 }
 
 const store = createStore();
+
+// Migrate words schema to enriched objects on initialization
+migrateWordsIfNeeded();
 
 // 会话缓存与辅助方法
 const MAX_EVENTS_PER_SESSION = 100;
@@ -420,7 +535,7 @@ function getState() {
     getDefaultState(),
     () => ({
       students: store.get('students', getDefaultValue('students')),
-      words: store.get('words', getDefaultValue('words')),
+      words: normalizeWordsArray(store.get('words', getDefaultValue('words'))),
       studentStats: store.get('studentStats', getDefaultValue('studentStats')),
       settings: store.get('settings', getDefaultValue('settings')),
       sessionHistory: store.get('sessionHistory', getDefaultValue('sessionHistory')),
@@ -442,7 +557,11 @@ function setState(nextState) {
 
       Object.keys(DEFAULT_STATE).forEach((key) => {
         if (nextState[key] !== undefined) {
-          store.set(key, nextState[key]);
+          if (key === 'words') {
+            store.set('words', normalizeWordsArray(nextState[key]));
+          } else {
+            store.set(key, nextState[key]);
+          }
         }
       });
 
@@ -463,6 +582,11 @@ function updatePartial(updates) {
 
       Object.entries(updates).forEach(([key, value]) => {
         if (!Object.prototype.hasOwnProperty.call(DEFAULT_STATE, key) || value === undefined) {
+          return;
+        }
+
+        if (key === 'words') {
+          store.set('words', normalizeWordsArray(value));
           return;
         }
 

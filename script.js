@@ -168,8 +168,42 @@ function resetExcludedStudents({ silent = false } = {}) {
     }
 }
 
+function _normalizeWordEntry(entry) {
+    if (entry == null) return null;
+    if (typeof entry === 'string' || typeof entry === 'number') {
+        const w = String(entry).trim();
+        if (!w) return null;
+        return { word: w, phonetic: null, definition: null, example: null, tags: [], imagePath: null, mastery: 0, lastReviewedAt: null, favorite: false };
+    }
+    if (typeof entry === 'object') {
+        const base = { word: '', phonetic: null, definition: null, example: null, tags: [], imagePath: null, mastery: 0, lastReviewedAt: null, favorite: false };
+        const word = typeof entry.word === 'string' ? entry.word
+            : typeof entry.text === 'string' ? entry.text
+            : typeof entry.value === 'string' ? entry.value
+            : typeof entry.term === 'string' ? entry.term : '';
+        const normalized = { ...base, ...entry, word: String(word || '').trim() };
+        if (!Array.isArray(entry.tags)) normalized.tags = Array.isArray(entry.tags) ? entry.tags : [];
+        else normalized.tags = entry.tags.filter((t)=>t!=null).map((t)=>String(t));
+        const m = Number(entry.mastery);
+        normalized.mastery = Number.isFinite(m) ? m : 0;
+        normalized.favorite = Boolean(entry.favorite);
+        ['phonetic','definition','example','imagePath'].forEach((k)=>{ normalized[k] = normalized[k] == null ? null : String(normalized[k]); });
+        if (!normalized.word) return null;
+        return normalized;
+    }
+    return null;
+}
+function _normalizeWordsArray(list) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    for (const item of list) {
+        const n = _normalizeWordEntry(item);
+        if (n && n.word) out.push(n);
+    }
+    return out;
+}
 function setWords(list) {
-    words = Array.isArray(list) ? Array.from(list) : [];
+    words = _normalizeWordsArray(list);
     availableWords = [...words];
 }
 
@@ -615,7 +649,8 @@ function displayWord(word) {
 
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item';
-    wordItem.textContent = word;
+    const text = (word && typeof word === 'object') ? (word.word || '') : String(word || '');
+    wordItem.textContent = text;
     wordGrid.appendChild(wordItem);
 
     switchScreen('wordScreen');
