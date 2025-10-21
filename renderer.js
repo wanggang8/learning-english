@@ -15,6 +15,7 @@ import './renderer/modules/commands.js';
 import './renderer/components/historyPanel.js';
 import './renderer/components/shortcutHelp.js';
 import './renderer/components/Flashcard.js';
+import './renderer/components/wordDetailModal.js';
 // 键盘管理器（依赖于 AppCommands 与组件）
 import './renderer/modules/keyboardManager.js';
 // 导入主脚本逻辑

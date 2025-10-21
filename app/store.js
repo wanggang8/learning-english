@@ -23,7 +23,9 @@ const DEFAULT_STATE = {
     activeSession: {
       id: null,
       startedAt: null,
-      events: []
+      events: [],
+      // 新增：闪卡复习日志（查看/掌握度变化/收藏变化/编辑）
+      wordsReview: []
     },
     archivedSessions: []
   },
@@ -180,6 +182,21 @@ const schema = {
               required: ['timestamp'],
               additionalProperties: true
             }
+          },
+          wordsReview: {
+            type: 'array',
+            default: [],
+            items: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string' },
+                word: { type: ['string', 'object', 'null'], default: null },
+                action: { type: 'string' }, // view|mastery|favorite|edit
+                payload: { type: ['object', 'null'], default: null }
+              },
+              required: ['timestamp', 'action'],
+              additionalProperties: true
+            }
           }
         },
         additionalProperties: true
@@ -215,6 +232,21 @@ const schema = {
                   payload: { type: ['object', 'null'], default: null }
                 },
                 required: ['timestamp'],
+                additionalProperties: true
+              }
+            },
+            wordsReview: {
+              type: 'array',
+              default: [],
+              items: {
+                type: 'object',
+                properties: {
+                  timestamp: { type: 'string' },
+                  word: { type: ['string', 'object', 'null'], default: null },
+                  action: { type: 'string' }, // view|mastery|favorite|edit
+                  payload: { type: ['object', 'null'], default: null }
+                },
+                required: ['timestamp', 'action'],
                 additionalProperties: true
               }
             },
@@ -477,6 +509,7 @@ migrateWordsIfNeeded();
 
 // 会话缓存与辅助方法
 const MAX_EVENTS_PER_SESSION = 100;
+const MAX_REVIEWS_PER_SESSION = 1000;
 let sessionCache = null;
 
 function createSessionId() {
@@ -487,7 +520,8 @@ function createNewActiveSession() {
   return {
     id: createSessionId(),
     startedAt: new Date().toISOString(),
-    events: []
+    events: [],
+    wordsReview: []
   };
 }
 
@@ -503,6 +537,9 @@ function ensureSessionCache() {
       if (!history.activeSession.id || !history.activeSession.startedAt) {
         history.activeSession.id = history.activeSession.id || createSessionId();
         history.activeSession.startedAt = history.activeSession.startedAt || new Date().toISOString();
+      }
+      if (!Array.isArray(history.activeSession.wordsReview)) {
+        history.activeSession.wordsReview = [];
       }
     }
     if (!Array.isArray(history.archivedSessions)) {
@@ -536,8 +573,12 @@ function archiveActiveSessionInternal() {
     id: active.id || createSessionId(),
     startedAt: active.startedAt || endedAt,
     endedAt,
-    events: active.events,
-    summary: { count: Array.isArray(active.events) ? active.events.length : 0 }
+    events: Array.isArray(active.events) ? active.events : [],
+    wordsReview: Array.isArray(active.wordsReview) ? active.wordsReview : [],
+    summary: {
+      count: Array.isArray(active.events) ? active.events.length : 0,
+      reviewCount: Array.isArray(active.wordsReview) ? active.wordsReview.length : 0
+    }
   });
   cache.activeSession = createNewActiveSession();
   flushSessionCache();
@@ -660,6 +701,11 @@ function clearHistory(options = {}) {
         cache.activeSession = createNewActiveSession();
       } else {
         cache.activeSession.events = [];
+        if (Array.isArray(cache.activeSession.wordsReview)) {
+          cache.activeSession.wordsReview = [];
+        } else {
+          cache.activeSession.wordsReview = [];
+        }
       }
       flushSessionCache();
       return { success: true };
@@ -700,6 +746,31 @@ function addSessionHistory(entry) {
         cache.activeSession.events.splice(0, cache.activeSession.events.length - MAX_EVENTS_PER_SESSION);
       }
 
+      flushSessionCache();
+      return { success: true };
+    }
+  );
+}
+
+function addWordReview(entry) {
+  return runWithFallback(
+    'addWordReview',
+    (error) => ({ success: false, error: error.message }),
+    () => {
+      const cache = ensureSessionCache();
+      const newEntry = {
+        timestamp: new Date().toISOString(),
+        word: entry && Object.prototype.hasOwnProperty.call(entry, 'word') ? entry.word : null,
+        action: entry && typeof entry.action === 'string' ? entry.action : 'view',
+        payload: entry && Object.prototype.hasOwnProperty.call(entry, 'payload') ? entry.payload : null
+      };
+      if (!Array.isArray(cache.activeSession.wordsReview)) {
+        cache.activeSession.wordsReview = [];
+      }
+      cache.activeSession.wordsReview.push(newEntry);
+      if (cache.activeSession.wordsReview.length > MAX_REVIEWS_PER_SESSION) {
+        cache.activeSession.wordsReview.splice(0, cache.activeSession.wordsReview.length - MAX_REVIEWS_PER_SESSION);
+      }
       flushSessionCache();
       return { success: true };
     }
@@ -753,6 +824,7 @@ module.exports = {
   clearHistory,
   clearSession,
   addSessionHistory,
+  addWordReview,
   // 设置
   getSettings,
   updateSettings
