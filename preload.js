@@ -11,6 +11,7 @@ const api = {
   clearHistory: (options) => store.clearHistory(options),
   clearSession: () => store.clearSession(),
   addSessionHistory: (entry) => store.addSessionHistory(entry),
+  addWordReview: (entry) => store.addWordReview(entry),
   // 设置
   getSettings: () => store.getSettings(),
   updateSettings: (newSettings) => store.updateSettings(newSettings)

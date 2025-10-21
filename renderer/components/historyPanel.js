@@ -201,10 +201,14 @@
     const panel = ensurePanel();
     const state = getState();
     const events = state?.sessionHistory?.activeSession?.events || [];
+    const reviews = state?.sessionHistory?.activeSession?.wordsReview || [];
 
     const summaryEl = document.getElementById('historySummary');
     const uniqStudents = new Set(events.map(e => e.student || '（未命名）'));
-    summaryEl.textContent = `本节共 ${events.length} 次 | 涉及 ${uniqStudents.size} 人`;
+    const masteryChanges = reviews.filter(r => r && r.action === 'mastery').length;
+    const favChanges = reviews.filter(r => r && r.action === 'favorite').length;
+    const reviewCount = reviews.length;
+    summaryEl.textContent = `本节共 ${events.length} 次 | 涉及 ${uniqStudents.size} 人` + (reviewCount ? ` | 复习 ${reviewCount}（掌握度 ${masteryChanges} · 收藏 ${favChanges}）` : '');
 
     const content = document.getElementById('historyContent');
     content.innerHTML = '';

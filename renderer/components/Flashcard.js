@@ -26,7 +26,8 @@
     FILTER_RANGE_WRAP: 'fcFilterRange',
     FILTER_MIN: 'fcFilterMin',
     FILTER_MAX: 'fcFilterMax',
-    SUMMARY: 'fcSummary'
+    SUMMARY: 'fcSummary',
+    EDIT_BTN: 'fcEditBtn'
   });
 
   const DEFAULT_PREFS = Object.freeze({
@@ -40,6 +41,8 @@
   let index = 0;
   let flipped = false; // true means back side currently visible
   let prefs = { ...DEFAULT_PREFS };
+  // 会话内对单词的临时修改（不持久化），按单词键合并覆盖
+  const sessionOverrides = new Map();
 
   function getEl(id){ return document.getElementById(id); }
 
@@ -79,7 +82,14 @@
     try {
       const r = window.PersistenceService?.getState();
       if (r && r.success && Array.isArray(r.data?.words)) {
-        return r.data.words;
+        const base = r.data.words;
+        if (sessionOverrides.size === 0) return base;
+        const out = base.map((w) => {
+          if (!w || !w.word) return w;
+          const patch = sessionOverrides.get(w.word);
+          return patch ? { ...w, ...patch } : w;
+        });
+        return out;
       }
     } catch (e) {}
     return [];
@@ -241,6 +251,7 @@
       actions.id = IDS.ACTIONS_WRAP;
       actions.innerHTML = `
         <button id="${IDS.FAV_BTN}" class="fc-fav-btn" title="收藏">☆</button>
+        <button id="${IDS.EDIT_BTN}" class="fc-edit-btn" title="查看/编辑">编辑</button>
         <div class="fc-mastery" id="${IDS.MASTERY_WRAP}">
           <button class="fc-m-btn" id="${IDS.MASTERY_BTN_PREFIX}0" data-level="0">M0</button>
           <button class="fc-m-btn" id="${IDS.MASTERY_BTN_PREFIX}1" data-level="1">M1</button>
@@ -290,6 +301,7 @@
 
     // Bind events
     getEl(IDS.FAV_BTN)?.addEventListener('click', toggleFavorite);
+    getEl(IDS.EDIT_BTN)?.addEventListener('click', openEditor);
     for (let i=0; i<=3; i++) {
       getEl(IDS.MASTERY_BTN_PREFIX + i)?.addEventListener('click', () => setMastery(i));
     }
@@ -449,6 +461,8 @@
     setFaceByDefault();
     updateControlsUI();
     renderCard();
+    // 进入时也认为查看了当前卡片
+    markReviewedForCurrent();
     activateScreen(IDS.SCREEN);
     // ensure actions are bound (in case screen existed in HTML)
     ensureToolbarControls(sc);
@@ -458,6 +472,13 @@
     const cur = deck[index];
     if (!cur || !cur.word) return;
     updateWordFields(cur.word, { lastReviewedAt: new Date().toISOString() }, { silent: true });
+    try {
+      window.PersistenceService?.addWordReview?.({
+        word: cur.word,
+        action: 'view',
+        payload: { face: flipped ? 'back' : 'front' }
+      });
+    } catch (e) {}
   }
 
   function flip() {
@@ -492,11 +513,19 @@
   function toggleFavorite() {
     const cur = deck[index];
     if (!cur || !cur.word) return;
-    const nextFav = !cur.favorite;
+    const prevFav = !!cur.favorite;
+    const nextFav = !prevFav;
     const patched = updateWordFields(cur.word, { favorite: nextFav });
     if (patched) {
       // update in-memory deck object
       cur.favorite = nextFav;
+      try {
+        window.PersistenceService?.addWordReview?.({
+          word: cur.word,
+          action: 'favorite',
+          payload: { before: prevFav, after: nextFav }
+        });
+      } catch (e) {}
       // if filter is favorites-only and unfavorited, remove from deck
       if (prefs.filters.mode === 'favorites' && !nextFav) {
         rebuildDeck({ preserveCurrent: false, reshuffle: false });
@@ -510,9 +539,17 @@
     const lv = clamp(level, 0, 3);
     const cur = deck[index];
     if (!cur || !cur.word) return;
+    const prevLv = clamp(Number(cur.mastery) || 0, 0, 3);
     const patched = updateWordFields(cur.word, { mastery: lv, lastReviewedAt: new Date().toISOString() });
     if (patched) {
       cur.mastery = lv;
+      try {
+        window.PersistenceService?.addWordReview?.({
+          word: cur.word,
+          action: 'mastery',
+          payload: { before: prevLv, after: lv }
+        });
+      } catch (e) {}
       // If current filter is mastery-range and this card moves out of range, rebuild deck
       if (prefs.filters.mode === 'mastery') {
         const min = Math.min(prefs.filters.masteryMin, prefs.filters.masteryMax);
@@ -544,6 +581,68 @@
     } catch (e) {
       return false;
     }
+  }
+
+  function applySessionEdit(wordKey, patch) {
+    if (!wordKey || !patch) return false;
+    const prev = sessionOverrides.get(wordKey) || {};
+    const merged = { ...prev, ...patch };
+    sessionOverrides.set(wordKey, merged);
+    // 更新当前卡片对象和 UI
+    const cur = deck[index];
+    if (cur && cur.word === wordKey) {
+      Object.assign(cur, patch);
+      // 如果改动影响筛选，需要检查是否仍在当前集合中
+      if (prefs.filters.mode === 'mastery' && patch.hasOwnProperty('mastery')) {
+        const lv = clamp(Number(cur.mastery) || 0, 0, 3);
+        const min = Math.min(prefs.filters.masteryMin, prefs.filters.masteryMax);
+        const max = Math.max(prefs.filters.masteryMin, prefs.filters.masteryMax);
+        if (!(lv >= min && lv <= max)) {
+          rebuildDeck({ preserveCurrent: false, reshuffle: false });
+          return true;
+        }
+      }
+      updateActionsUI(cur);
+      renderCard();
+    }
+    try { window.Feedback?.showSuccess?.('已应用到本次会话'); } catch (e) {}
+    return true;
+  }
+
+  function openEditor() {
+    const cur = deck[index];
+    if (!cur || !cur.word) return;
+    if (!window.WordDetailModal || typeof window.WordDetailModal.open !== 'function') {
+      try { window.Feedback?.showWarning?.('编辑模块未加载'); } catch (e) {}
+      return;
+    }
+    const base = { ...cur };
+    window.WordDetailModal.open(base, {
+      onApplySession: (patch) => {
+        if (!patch || typeof patch !== 'object') return;
+        applySessionEdit(cur.word, patch);
+        try { window.PersistenceService?.addWordReview?.({ word: cur.word, action: 'edit', payload: { scope: 'session', patch } }); } catch (e) {}
+      },
+      onPersistGlobal: (patch) => {
+        if (!patch || typeof patch !== 'object') return;
+        const saved = updateWordFields(cur.word, patch, { silent: false });
+        if (saved) {
+          Object.assign(cur, patch);
+          // 过滤条件可能变化
+          if (patch.hasOwnProperty('mastery') && prefs.filters.mode === 'mastery') {
+            const lv = clamp(Number(cur.mastery) || 0, 0, 3);
+            const min = Math.min(prefs.filters.masteryMin, prefs.filters.masteryMax);
+            const max = Math.max(prefs.filters.masteryMin, prefs.filters.masteryMax);
+            if (!(lv >= min && lv <= max)) {
+              rebuildDeck({ preserveCurrent: false, reshuffle: false });
+              return;
+            }
+          }
+          renderCard();
+          try { window.PersistenceService?.addWordReview?.({ word: cur.word, action: 'edit', payload: { scope: 'global', patch } }); } catch (e) {}
+        }
+      }
+    });
   }
 
   function updateSummary() {
