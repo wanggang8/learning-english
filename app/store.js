@@ -14,7 +14,8 @@ const DEFAULT_STATE = {
     flashcard: {
       order: 'shuffled',
       defaultFace: 'front',
-      includeImages: true
+      includeImages: true,
+      filters: { mode: 'all', masteryMin: 0, masteryMax: 3 }
     }
   },
   // 会话历史：区分活动会话与归档会话
@@ -128,7 +129,17 @@ const schema = {
         properties: {
           order: { type: 'string', default: 'shuffled' },
           defaultFace: { type: 'string', default: 'front' },
-          includeImages: { type: 'boolean', default: true }
+          includeImages: { type: 'boolean', default: true },
+          filters: {
+            type: 'object',
+            default: { mode: 'all', masteryMin: 0, masteryMax: 3 },
+            properties: {
+              mode: { type: 'string', default: 'all' },
+              masteryMin: { type: 'number', default: 0 },
+              masteryMax: { type: 'number', default: 3 }
+            },
+            additionalProperties: true
+          }
         },
         additionalProperties: true
       }

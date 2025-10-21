@@ -1,6 +1,28 @@
+# Node/Electron
 node_modules/
 dist/
+build/
+release/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 *.log
+
+# OS
 .DS_Store
-*.pyc
-__pycache__/
+Thumbs.db
+
+# Env
+.env
+.env.*
+
+# Coverage
+coverage/
+
+# Editor
+.vscode/
+.idea/
+*.swp
