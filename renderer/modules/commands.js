@@ -56,6 +56,8 @@
     const screen = getActiveScreenId();
     // 抽取动画中不触发重抽，避免多重计时器冲突
     if (screen === 'drawingScreen') return;
+    // 闪卡界面不触发“重抽”，避免误操作中断学习
+    if (screen === 'flashcardScreen') return;
     // 在任意其它界面直接开始下一次抽取
     if (screen === 'wordScreen') {
       // 回到开始再抽
@@ -125,6 +127,23 @@
     uiBack();
   }
 
+  // Flashcard commands
+  function flashcardOpen() {
+    try {
+      const stateRes = window.PersistenceService?.getState();
+      const words = stateRes && stateRes.success && Array.isArray(stateRes.data?.words) ? stateRes.data.words : [];
+      if (!words.length) {
+        window.Feedback?.showToast('请先导入单词列表', window.Feedback?.TOAST_TYPES?.INFO || 'info', 3000);
+        try { window.showFileUploadPrompt && window.showFileUploadPrompt(); } catch(e) {}
+        return;
+      }
+    } catch (e) {}
+    try { window.Flashcard && window.Flashcard.open && window.Flashcard.open(); } catch (e) { console.error('flashcardOpen failed', e); }
+  }
+  function flashcardFlip() { try { window.Flashcard && window.Flashcard.flip && window.Flashcard.flip(); } catch (e) {} }
+  function flashcardNext() { try { window.Flashcard && window.Flashcard.next && window.Flashcard.next(); } catch (e) {} }
+  function flashcardPrev() { try { window.Flashcard && window.Flashcard.prev && window.Flashcard.prev(); } catch (e) {} }
+
   // 将命令暴露给其他模块（如 keyboardManager）
   window.AppCommands = Object.freeze({
     getActiveScreenId,
@@ -139,7 +158,12 @@
     helpToggle,
     fullscreenToggle,
     fullscreenExit,
-    backOrExitFullscreen
+    backOrExitFullscreen,
+    // flashcard
+    flashcardOpen,
+    flashcardFlip,
+    flashcardNext,
+    flashcardPrev
   });
 
   // 初始化全屏事件同步
@@ -160,5 +184,10 @@
     window.AppEvents.on('help:close', helpClose);
     window.AppEvents.on('help:toggle', helpToggle);
     window.AppEvents.on('ui:backOrExit', backOrExitFullscreen);
+    // Flashcard events
+    window.AppEvents.on('flashcard:open', flashcardOpen);
+    window.AppEvents.on('flashcard:flip', flashcardFlip);
+    window.AppEvents.on('flashcard:next', flashcardNext);
+    window.AppEvents.on('flashcard:prev', flashcardPrev);
   }
 })();

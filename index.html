@@ -28,6 +28,9 @@
             <div id="startScreen" class="screen active">
                 <h1 class="title">🌟 单词小勇士 🌟</h1>
                 <button class="btn-primary" onclick="startDrawing()">开始冒险</button>
+                <div style="margin-top: 1rem;">
+                  <button class="btn-secondary" id="flashcardOpenBtn" onclick="openFlashcards()">学习卡片</button>
+                </div>
             </div>
 
             <!-- 抽取中页面 -->
@@ -49,6 +52,50 @@
                 <h2 class="subtitle">💪 加油！你的单词是</h2>
                 <div class="word-grid" id="wordGrid"></div>
                 <button class="btn-back" onclick="resetToStart()">继续冒险</button>
+            </div>
+
+            <!-- 学习卡片页面 -->
+            <div id="flashcardScreen" class="screen">
+                <h2 class="subtitle">📚 学习卡片</h2>
+                <div class="flashcard-container">
+                    <div class="flashcard" id="flashcard">
+                        <div class="face front">
+                            <div class="fc-word" id="fcWord"></div>
+                            <div class="fc-phonetic" id="fcPhonetic"></div>
+                        </div>
+                        <div class="face back">
+                            <div class="fc-definition" id="fcDefinition"></div>
+                            <div class="fc-example" id="fcExample"></div>
+                            <img class="fc-image" id="fcImage" alt="">
+                        </div>
+                    </div>
+                </div>
+                <div class="flashcard-toolbar">
+                    <div class="fc-status"><span id="fcIndex">0</span>/<span id="fcCount">0</span></div>
+                    <div class="fc-controls">
+                        <button class="btn-secondary" id="fcPrevBtn">⬅ 上一张</button>
+                        <button class="btn-primary" id="fcFlipBtn">翻面 (Space)</button>
+                        <button class="btn-secondary" id="fcNextBtn">下一张 ➡</button>
+                    </div>
+                    <div class="fc-prefs">
+                        <label>排列
+                            <select id="fcOrderSelect">
+                                <option value="shuffled">随机</option>
+                                <option value="ordered">顺序</option>
+                            </select>
+                        </label>
+                        <label>默认面
+                            <select id="fcDefaultFace">
+                                <option value="front">正面</option>
+                                <option value="back">背面</option>
+                            </select>
+                        </label>
+                        <label class="fc-checkbox"><input type="checkbox" id="fcIncludeImages" checked> 显示图片</label>
+                    </div>
+                    <div class="fc-footer">
+                        <button class="btn-back" onclick="resetToStart()">返回</button>
+                    </div>
+                </div>
             </div>
         </div>
 
