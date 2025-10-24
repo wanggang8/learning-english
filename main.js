@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -96,6 +96,22 @@ function registerIpcHandlers() {
             return { success: true, url: rel, existed: false, deduped: false };
         } catch (e) {
             return { success: false, error: e?.message || 'copy-failed' };
+        }
+    });
+
+    ipcMain.handle('templates.openWordsWorkbook', async () => {
+        try {
+            const templatePath = path.join(__dirname, 'data', '单词列表.xlsx');
+            if (!fs.existsSync(templatePath)) {
+                return { success: false, error: 'not-found', path: templatePath };
+            }
+            const result = await shell.openPath(templatePath);
+            if (result) {
+                return { success: false, error: result, path: templatePath };
+            }
+            return { success: true, path: templatePath };
+        } catch (e) {
+            return { success: false, error: e?.message || 'open-failed' };
         }
     });
 }

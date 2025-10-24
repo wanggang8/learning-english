@@ -15,6 +15,182 @@ const DATA_TYPES = {
   WORDS: 'words'
 };
 
+const WORD_DEFAULTS = Object.freeze({
+  word: '',
+  phonetic: null,
+  definition: null,
+  example: null,
+  tags: [],
+  imagePath: null,
+  mastery: 0,
+  lastReviewedAt: null,
+  favorite: false
+});
+
+const STUDENT_HEADER_KEYWORDS = ['姓名', 'name', 'student', '学生', 'student name', '同学'];
+
+const WORD_HEADER_ALIASES = Object.freeze({
+  word: ['单词', 'word', '词汇', '词语', '英文', 'vocabulary', 'term'],
+  phonetic: ['音标', 'phonetic', '发音', 'pronunciation'],
+  definition: ['释义', 'definition', 'meaning', '中文释义', '解释'],
+  example: ['例句', 'example', 'sentence', '示例', '用法'],
+  tags: ['标签', 'tags', '分类', '类别', '主题'],
+  image: ['图片', 'image', 'img', 'image path', '图片路径', 'picture']
+});
+
+function normalizeWhitespace(value, { preserveNewlines = false } = {}) {
+  if (value == null) return '';
+  let str = String(value);
+  str = str.replace(/\r\n/g, '\n').replace(/\u00A0/g, ' ');
+  if (!preserveNewlines) {
+    return str.replace(/\s+/g, ' ').trim();
+  }
+  const lines = str.split('\n').map((line) => line.replace(/\s+/g, ' ').trim());
+  return lines.join('\n').trim();
+}
+
+function normalizeOptionalString(value, options) {
+  const normalized = normalizeWhitespace(value, options);
+  return normalized ? normalized : null;
+}
+
+function sanitizeTags(value) {
+  if (value == null) return [];
+  const queue = Array.isArray(value) ? value.slice() : [value];
+  const result = [];
+  const seen = new Set();
+
+  while (queue.length) {
+    const item = queue.shift();
+    if (item == null) continue;
+    if (Array.isArray(item)) {
+      queue.push(...item);
+      continue;
+    }
+    const raw = normalizeWhitespace(item, { preserveNewlines: true });
+    if (!raw) continue;
+    const parts = raw.split(/[\n,，;；|｜\/\\]+/);
+    for (const part of parts) {
+      const cleaned = normalizeWhitespace(part);
+      if (!cleaned) continue;
+      const trimmed = cleaned.replace(/^#/, '').trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(trimmed);
+    }
+  }
+  return result;
+}
+
+function findHeaderIndex(normalizedHeader, aliases) {
+  if (!Array.isArray(normalizedHeader) || !Array.isArray(aliases)) return -1;
+  for (let i = 0; i < normalizedHeader.length; i++) {
+    const cell = normalizedHeader[i];
+    if (!cell) continue;
+    if (aliases.some((alias) => {
+      const token = String(alias || '').toLowerCase();
+      return cell === token || cell.includes(token);
+    })) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function buildWordHeaderMap(headerRow) {
+  const normalized = Array.isArray(headerRow)
+    ? headerRow.map((cell) => normalizeWhitespace(cell).toLowerCase())
+    : [];
+  const map = {
+    word: findHeaderIndex(normalized, WORD_HEADER_ALIASES.word),
+    phonetic: findHeaderIndex(normalized, WORD_HEADER_ALIASES.phonetic),
+    definition: findHeaderIndex(normalized, WORD_HEADER_ALIASES.definition),
+    example: findHeaderIndex(normalized, WORD_HEADER_ALIASES.example),
+    tags: findHeaderIndex(normalized, WORD_HEADER_ALIASES.tags),
+    image: findHeaderIndex(normalized, WORD_HEADER_ALIASES.image)
+  };
+  if (map.word == null || map.word < 0) {
+    map.word = normalized.length > 0 ? 0 : -1;
+  }
+  return map;
+}
+
+function getCellValue(row, index) {
+  if (!Array.isArray(row) || typeof index !== 'number' || index < 0) return undefined;
+  return row[index];
+}
+
+function normalizeWordEntry(entry) {
+  if (entry == null) return null;
+  if (typeof entry === 'string' || typeof entry === 'number') {
+    const wordText = normalizeWhitespace(entry);
+    if (!wordText) return null;
+    return { ...WORD_DEFAULTS, word: wordText };
+  }
+  if (typeof entry === 'object') {
+    const wordCandidate =
+      entry.word ?? entry.text ?? entry.value ?? entry.term ?? entry.label ?? '';
+    const wordText = normalizeWhitespace(wordCandidate);
+    if (!wordText) return null;
+
+    const normalized = {
+      ...WORD_DEFAULTS,
+      ...entry,
+      word: wordText
+    };
+
+    normalized.phonetic = normalizeOptionalString(entry.phonetic ?? entry.pronunciation);
+    normalized.definition = normalizeOptionalString(entry.definition ?? entry.meaning, { preserveNewlines: true });
+    normalized.example = normalizeOptionalString(entry.example ?? entry.sentence, { preserveNewlines: true });
+    const tagSource = entry.tags ?? entry.tag ?? entry.category ?? entry.categories;
+    normalized.tags = sanitizeTags(tagSource);
+    const imageSource = entry.imagePath ?? entry.image ?? entry.img ?? entry.picture ?? entry['image path'];
+    normalized.imagePath = normalizeOptionalString(imageSource);
+
+    const masteryValue = Number(entry.mastery);
+    normalized.mastery = Number.isFinite(masteryValue) ? masteryValue : WORD_DEFAULTS.mastery;
+
+    if (entry.lastReviewedAt != null) {
+      normalized.lastReviewedAt = String(entry.lastReviewedAt);
+    } else {
+      normalized.lastReviewedAt = WORD_DEFAULTS.lastReviewedAt;
+    }
+
+    normalized.favorite = Boolean(entry.favorite);
+
+    return normalized;
+  }
+  return null;
+}
+
+function rowHasOtherContent(row, excludeIndex) {
+  if (!Array.isArray(row)) return false;
+  for (let i = 0; i < row.length; i++) {
+    if (i === excludeIndex) continue;
+    if (normalizeWhitespace(row[i], { preserveNewlines: true })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeWordListForImport(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const entry = normalizeWordEntry(item);
+    if (!entry || !entry.word) continue;
+    const key = entry.word.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
+}
+
 /**
  * 读取文件并返回 ArrayBuffer
  * @param {File} file - 要读取的文件
@@ -103,18 +279,22 @@ function validateAndCleanData(rawData, dataType) {
     return { valid: false, error: '未检测到表头行（第 1 行）', data: [] };
   }
 
-  const firstHeaderCell = header[0] == null ? '' : String(header[0]).trim().toLowerCase();
+  const normalizedHeader = header.map((cell) => normalizeWhitespace(cell).toLowerCase());
   const needStudents = dataType === DATA_TYPES.STUDENTS;
   const needWords = dataType === DATA_TYPES.WORDS;
 
-  const okStudents = ['姓名', 'name', 'student', '学生', 'student name'].some(k => firstHeaderCell.includes(k.toLowerCase()));
-  const okWords = ['单词', 'word', 'vocabulary', '词汇'].some(k => firstHeaderCell.includes(k.toLowerCase()));
+  const hasStudentHeader = normalizedHeader.some((cell) =>
+    STUDENT_HEADER_KEYWORDS.some((keyword) => cell.includes(String(keyword || '').toLowerCase()))
+  );
+  const hasWordHeader = normalizedHeader.some((cell) =>
+    WORD_HEADER_ALIASES.word.some((keyword) => cell.includes(String(keyword || '').toLowerCase()))
+  );
 
-  if (needStudents && !okStudents) {
-    return { valid: false, error: '未检测到表头“姓名”。请确认第一行第一列为“姓名”。', data: [] };
+  if (needStudents && !hasStudentHeader) {
+    return { valid: false, error: '未检测到表头“姓名”。请确认包含“姓名”列。', data: [] };
   }
-  if (needWords && !okWords) {
-    return { valid: false, error: '未检测到表头“单词”。请确认第一行第一列为“单词”。', data: [] };
+  if (needWords && !hasWordHeader) {
+    return { valid: false, error: '未检测到表头“单词”。请确认包含“单词”列。', data: [] };
   }
 
   const cleaned = [];
@@ -123,40 +303,67 @@ function validateAndCleanData(rawData, dataType) {
   let invalidRows = 0;
   let duplicateCount = 0;
 
-  // 针对单词表，识别图片列（可选）
-  let imgCol = -1;
+  let headerMap = null;
   if (needWords) {
-    try {
-      const hdrs = header.map((h) => (h == null ? '' : String(h).trim().toLowerCase()));
-      const imgTokens = ['图片', 'image', 'img', 'image path', '图片路径'];
-      imgCol = hdrs.findIndex((h) => imgTokens.some((t) => h.includes(t.toLowerCase())));
-    } catch (_) { imgCol = -1; }
+    headerMap = buildWordHeaderMap(header);
   }
 
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
-    if (!Array.isArray(row)) { invalidRows++; continue; }
-    const cell = row[0];
-    if (cell == null) { emptyRows++; continue; }
-    if (typeof cell !== 'string' && typeof cell !== 'number') { invalidRows++; continue; }
-
-    const value = String(cell).trim();
-    if (!value) { emptyRows++; continue; }
-
-    if (seen.has(value)) { duplicateCount++; continue; }
-    seen.add(value);
+    if (!Array.isArray(row)) {
+      invalidRows++;
+      continue;
+    }
 
     if (needWords) {
-      const entry = { word: value };
-      if (imgCol >= 0) {
-        const imgRef = row[imgCol];
-        if (imgRef != null && imgRef !== '') {
-          const s = String(imgRef).trim();
-          if (s) entry.imagePath = s; // 暂存原始引用，后续归一化
+      const wordCell = getCellValue(row, headerMap.word);
+      const wordText = normalizeWhitespace(wordCell);
+      if (!wordText) {
+        if (rowHasOtherContent(row, headerMap.word)) {
+          invalidRows++;
+        } else {
+          emptyRows++;
         }
+        continue;
       }
+
+      const entry = normalizeWordEntry({
+        word: wordText,
+        phonetic: getCellValue(row, headerMap.phonetic),
+        definition: getCellValue(row, headerMap.definition),
+        example: getCellValue(row, headerMap.example),
+        tags: getCellValue(row, headerMap.tags),
+        imagePath: getCellValue(row, headerMap.image)
+      });
+
+      if (!entry) {
+        invalidRows++;
+        continue;
+      }
+
+      const key = entry.word.toLowerCase();
+      if (seen.has(key)) {
+        duplicateCount++;
+        continue;
+      }
+      seen.add(key);
       cleaned.push(entry);
     } else {
+      const cell = getCellValue(row, 0);
+      const value = normalizeWhitespace(cell);
+      if (!value) {
+        if (rowHasOtherContent(row, 0)) {
+          invalidRows++;
+        } else {
+          emptyRows++;
+        }
+        continue;
+      }
+      if (seen.has(value)) {
+        duplicateCount++;
+        continue;
+      }
+      seen.add(value);
       cleaned.push(value);
     }
   }
@@ -382,13 +589,13 @@ async function normalizeWordImages(list) {
 
 /**
  * 导入测试数据
- * @param {Array<string>} data - 测试数据
+ * @param {Array} data - 测试数据
  * @param {string} dataType - 数据类型（students/words）
  * @returns {Promise<Object>} 导入结果
  */
 async function importTestData(data, dataType) {
   try {
-    console.log(`${MODULE_NAME} 导入测试数据 ${dataType}:`, data.length);
+    console.log(`${MODULE_NAME} 导入测试数据 ${dataType}:`, Array.isArray(data) ? data.length : 0);
     
     if (!Array.isArray(data) || data.length === 0) {
       return {
@@ -398,18 +605,49 @@ async function importTestData(data, dataType) {
       };
     }
     
+    let prepared = data;
+    if (dataType === DATA_TYPES.WORDS) {
+      prepared = normalizeWordListForImport(data);
+      if (!prepared.length) {
+        return {
+          success: false,
+          error: '测试数据为空',
+          data: []
+        };
+      }
+    } else if (dataType === DATA_TYPES.STUDENTS) {
+      const deduped = [];
+      const seen = new Set();
+      for (const item of data) {
+        const name = normalizeWhitespace(item);
+        if (!name || seen.has(name)) {
+          continue;
+        }
+        seen.add(name);
+        deduped.push(name);
+      }
+      prepared = deduped;
+      if (!prepared.length) {
+        return {
+          success: false,
+          error: '测试数据为空',
+          data: []
+        };
+      }
+    }
+    
     const metadata = {
       filename: 'test-data',
       filepath: null,
       sourceType: SOURCE_TYPES.TEST
     };
     
-    await saveToStore(data, dataType, metadata);
+    await saveToStore(prepared, dataType, metadata);
     
     return {
       success: true,
-      data: data,
-      count: data.length,
+      data: prepared,
+      count: prepared.length,
       filename: 'test-data'
     };
     
@@ -584,5 +822,11 @@ window.DataImporter = Object.freeze({
   importTestData,
   importBothFiles,
   getImportStats,
-  detectFileType
+  detectFileType,
+  utils: Object.freeze({
+    normalizeWhitespace,
+    sanitizeTags,
+    normalizeWordEntry,
+    normalizeWordListForImport
+  })
 });

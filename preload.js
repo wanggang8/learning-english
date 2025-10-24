@@ -48,6 +48,17 @@ const assetService = Object.freeze({
   }
 });
 
+const templateService = Object.freeze({
+  openWordsWorkbook: async () => {
+    try {
+      return await ipcRenderer.invoke('templates.openWordsWorkbook');
+    } catch (e) {
+      return { success: false, error: e?.message || 'ipc-failed' };
+    }
+  }
+});
+
 contextBridge.exposeInMainWorld('store', Object.freeze(api));
 contextBridge.exposeInMainWorld('windowControls', windowControls);
 contextBridge.exposeInMainWorld('AssetService', assetService);
+contextBridge.exposeInMainWorld('TemplateService', templateService);
