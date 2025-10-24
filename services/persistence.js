@@ -73,10 +73,50 @@ const WORD_DEFAULTS = Object.freeze({
   favorite: false
 });
 
+function normalizeWhitespace(value, { preserveNewlines = false } = {}) {
+  if (value == null) return '';
+  let str = String(value);
+  str = str.replace(/\r\n/g, '\n').replace(/\u00A0/g, ' ');
+  if (!preserveNewlines) {
+    return str.replace(/\s+/g, ' ').trim();
+  }
+  const lines = str.split('\n').map((line) => line.replace(/\s+/g, ' ').trim());
+  return lines.join('\n').trim();
+}
+
+function sanitizeTags(value) {
+  if (value == null) return [];
+  const queue = Array.isArray(value) ? value.slice() : [value];
+  const result = [];
+  const seen = new Set();
+  while (queue.length) {
+    const item = queue.shift();
+    if (item == null) continue;
+    if (Array.isArray(item)) {
+      queue.push(...item);
+      continue;
+    }
+    const raw = normalizeWhitespace(item, { preserveNewlines: true });
+    if (!raw) continue;
+    const parts = raw.split(/[\n,，;；|｜\/\\]+/);
+    for (const part of parts) {
+      const cleaned = normalizeWhitespace(part);
+      if (!cleaned) continue;
+      const tag = cleaned.replace(/^#/, '').trim();
+      if (!tag) continue;
+      const key = tag.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(tag);
+    }
+  }
+  return result;
+}
+
 function normalizeWordEntry(entry) {
   if (entry == null) return null;
   if (typeof entry === 'string' || typeof entry === 'number') {
-    const w = String(entry).trim();
+    const w = normalizeWhitespace(entry);
     if (!w) return null;
     return { ...WORD_DEFAULTS, word: w };
   }
@@ -91,13 +131,9 @@ function normalizeWordEntry(entry) {
     const normalized = {
       ...base,
       ...entry,
-      word: String(word || '').trim()
+      word: normalizeWhitespace(word)
     };
-    if (!Array.isArray(entry.tags)) {
-      normalized.tags = Array.isArray(entry.tags) ? entry.tags : [];
-    } else {
-      normalized.tags = entry.tags.filter((t) => t != null).map((t) => String(t));
-    }
+    normalized.tags = sanitizeTags(entry.tags ?? entry.tag ?? entry.category ?? entry.categories);
     const m = Number(entry.mastery);
     normalized.mastery = Number.isFinite(m) ? m : 0;
     if (normalized.lastReviewedAt != null) {
@@ -106,9 +142,11 @@ function normalizeWordEntry(entry) {
       normalized.lastReviewedAt = null;
     }
     normalized.favorite = Boolean(entry.favorite);
-    ['phonetic','definition','example','imagePath'].forEach((k)=>{
-      if (normalized[k] == null) normalized[k] = null; else normalized[k] = String(normalized[k]);
-    });
+    normalized.phonetic = normalized.phonetic == null ? null : normalizeWhitespace(normalized.phonetic);
+    normalized.definition = normalized.definition == null ? null : normalizeWhitespace(normalized.definition, { preserveNewlines: true });
+    normalized.example = normalized.example == null ? null : normalizeWhitespace(normalized.example, { preserveNewlines: true });
+    const imageSource = entry.imagePath ?? entry.image ?? entry.img ?? entry.picture ?? entry['image path'];
+    normalized.imagePath = imageSource == null ? null : normalizeWhitespace(imageSource);
     if (!normalized.word) return null;
     return normalized;
   }
