@@ -1122,6 +1122,7 @@ button:disabled,
 .fc-example { color: #334155; font-style: italic; font-size: 1rem; opacity: 0.9; text-align: center; }
 
 .fc-image { max-width: 80%; max-height: 46%; border-radius: 10px; border: 3px solid #ffd700; margin-top: 0.6rem; display: none; }
+.fc-image.placeholder { opacity: 0.6; filter: grayscale(0.2); border-style: dashed; }
 
 .flashcard-toolbar { display: grid; gap: 0.6rem; justify-items: center; margin-top: 0.4rem; }
 .fc-status { color: #fff; font-weight: bold; }

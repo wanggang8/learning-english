@@ -36,5 +36,18 @@ const windowControls = Object.freeze({
   }
 });
 
+// 资源管理 API：通过 IPC 调用主进程进行本地图片复制与去重
+const assetService = Object.freeze({
+  copyImage: async (srcPathOrUrl) => {
+    try {
+      const res = await ipcRenderer.invoke('assets.copyImage', srcPathOrUrl);
+      return res;
+    } catch (e) {
+      return { success: false, error: e?.message || 'ipc-failed' };
+    }
+  }
+});
+
 contextBridge.exposeInMainWorld('store', Object.freeze(api));
 contextBridge.exposeInMainWorld('windowControls', windowControls);
+contextBridge.exposeInMainWorld('AssetService', assetService);

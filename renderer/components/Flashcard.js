@@ -219,12 +219,20 @@
 
     const imgEl = getEl(IDS.IMG);
     if (imgEl) {
-      if (prefs.includeImages && imgPath) {
-        imgEl.src = imgPath;
+      if (prefs.includeImages) {
+        const placeholder = 'assets/placeholder.svg';
+        if (imgPath) {
+          imgEl.src = imgPath;
+          imgEl.classList.remove('placeholder');
+        } else {
+          imgEl.src = placeholder;
+          imgEl.classList.add('placeholder');
+        }
         imgEl.style.display = '';
       } else {
         imgEl.removeAttribute('src');
         imgEl.style.display = 'none';
+        imgEl.classList.remove('placeholder');
       }
     }
 
