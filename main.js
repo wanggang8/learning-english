@@ -2,8 +2,11 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const createOfflineTTS = require('./services/tts');
 
-function registerIpcHandlers() {
+const ttsService = createOfflineTTS();
+
+function registerIpcHandlers(ttsService) {
     ipcMain.handle('toggle-fullscreen', (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return false;
@@ -114,6 +117,109 @@ function registerIpcHandlers() {
             return { success: false, error: e?.message || 'open-failed' };
         }
     });
+
+    ipcMain.handle('tts:speak', async (_event, payload) => {
+        try {
+            if (!ttsService) {
+                return {
+                    success: false,
+                    error: 'Text-to-speech is unavailable on this platform.',
+                    code: 'tts-unavailable',
+                    platform: process.platform
+                };
+            }
+            if (payload !== undefined && payload !== null && typeof payload !== 'object' && typeof payload !== 'string') {
+                return {
+                    success: false,
+                    error: 'Invalid arguments provided for TTS speak.',
+                    code: 'invalid-arguments',
+                    platform: process.platform
+                };
+            }
+            return ttsService.speak(payload);
+        } catch (error) {
+            return {
+                success: false,
+                error: error?.message || 'Failed to initiate speech synthesis.',
+                code: 'speak-failed',
+                platform: process.platform
+            };
+        }
+    });
+
+    ipcMain.handle('tts:stop', async (_event, options) => {
+        try {
+            if (!ttsService) {
+                return {
+                    success: false,
+                    error: 'Text-to-speech is unavailable on this platform.',
+                    code: 'tts-unavailable',
+                    platform: process.platform
+                };
+            }
+            if (options !== undefined && options !== null && typeof options !== 'object') {
+                return {
+                    success: false,
+                    error: 'Invalid arguments provided for TTS stop.',
+                    code: 'invalid-arguments',
+                    platform: process.platform
+                };
+            }
+            return ttsService.stop(options || {});
+        } catch (error) {
+            return {
+                success: false,
+                error: error?.message || 'Failed to stop speech synthesis.',
+                code: 'stop-failed',
+                platform: process.platform
+            };
+        }
+    });
+
+    ipcMain.handle('tts:getVoices', async () => {
+        try {
+            if (!ttsService) {
+                return {
+                    success: false,
+                    error: 'Text-to-speech is unavailable on this platform.',
+                    code: 'tts-unavailable',
+                    platform: process.platform
+                };
+            }
+            return await ttsService.getVoices();
+        } catch (error) {
+            return {
+                success: false,
+                error: error?.message || 'Failed to query installed voices.',
+                code: 'voice-query-failed',
+                platform: process.platform
+            };
+        }
+    });
+}
+
+function broadcastTtsStatus(payload) {
+    if (!payload) {
+        return;
+    }
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+        try {
+            win.webContents.send('tts:status', payload);
+        } catch (_error) {
+            // Ignore delivery failures for closed windows.
+        }
+    }
+}
+
+if (ttsService && typeof ttsService.on === 'function') {
+    ttsService.on('status', (payload) => {
+        try {
+            broadcastTtsStatus(payload);
+        } catch (error) {
+            console.error('[TTS] Failed to broadcast status event:', error);
+        }
+    });
 }
 
 function createWindow() {
@@ -146,7 +252,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-    registerIpcHandlers();
+    registerIpcHandlers(ttsService);
     createWindow();
 
     app.on('activate', () => {
