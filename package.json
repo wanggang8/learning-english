@@ -72,6 +72,7 @@
     }
   },
   "dependencies": {
-    "electron-store": "^11.0.2"
+    "electron-store": "^11.0.2",
+    "say": "^0.16.0"
   }
 }

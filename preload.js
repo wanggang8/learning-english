@@ -58,7 +58,109 @@ const templateService = Object.freeze({
   }
 });
 
+const TTS_STATUS_CHANNEL = 'tts:status';
+const MAX_TTS_TEXT_LENGTH = 5000;
+const TTS_RATE_MIN = 0.1;
+const TTS_RATE_MAX = 3.0;
+const UNSAFE_VOICE_PATTERN = /[;&|><`$\\]/;
+const VOICE_NEWLINE_PATTERN = /[\r\n]/;
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const sanitizeSpeakOptions = (input) => {
+  let payload = input;
+  if (typeof payload === 'string') {
+    payload = { text: payload };
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return { success: false, error: 'invalid-arguments' };
+  }
+
+  let text = payload.text;
+  if (typeof text !== 'string') {
+    text = text == null ? '' : String(text);
+  }
+  text = text.replace(/\r\n/g, '\n').trim();
+  if (!text) {
+    return { success: false, error: 'empty-text' };
+  }
+  if (text.length > MAX_TTS_TEXT_LENGTH) {
+    return { success: false, error: 'text-too-long', limit: MAX_TTS_TEXT_LENGTH };
+  }
+
+  const sanitized = { text };
+
+  if (payload.voice != null) {
+    if (typeof payload.voice !== 'string') {
+      return { success: false, error: 'invalid-voice' };
+    }
+    const cleaned = payload.voice.trim();
+    if (cleaned) {
+      if (UNSAFE_VOICE_PATTERN.test(cleaned) || VOICE_NEWLINE_PATTERN.test(cleaned)) {
+        return { success: false, error: 'voice-unsafe' };
+      }
+      sanitized.voice = cleaned;
+    }
+  }
+
+  if (payload.rate != null) {
+    const numeric = Number(payload.rate);
+    if (!Number.isFinite(numeric)) {
+      return { success: false, error: 'invalid-rate' };
+    }
+    const clamped = clamp(numeric, TTS_RATE_MIN, TTS_RATE_MAX);
+    sanitized.rate = Math.round(clamped * 1000) / 1000;
+  }
+
+  return { success: true, value: sanitized };
+};
+
+const sanitizeStopOptions = (input) => {
+  if (input !== undefined && input !== null && typeof input !== 'object') {
+    return { success: false, error: 'invalid-arguments' };
+  }
+  return { success: true, value: {} };
+};
+
+const ttsApi = Object.freeze({
+  speak: async (options) => {
+    const sanitized = sanitizeSpeakOptions(options);
+    if (!sanitized.success) return sanitized;
+    try {
+      return await ipcRenderer.invoke('tts:speak', sanitized.value);
+    } catch (e) {
+      return { success: false, error: e?.message || 'ipc-failed' };
+    }
+  },
+  stop: async (options) => {
+    const sanitized = sanitizeStopOptions(options);
+    if (!sanitized.success) return sanitized;
+    try {
+      return await ipcRenderer.invoke('tts:stop', sanitized.value);
+    } catch (e) {
+      return { success: false, error: e?.message || 'ipc-failed' };
+    }
+  },
+  getVoices: async () => {
+    try {
+      return await ipcRenderer.invoke('tts:getVoices');
+    } catch (e) {
+      return { success: false, error: e?.message || 'ipc-failed' };
+    }
+  },
+  onStatus: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (_event, payload) => {
+      try { callback(payload); } catch (_err) { /* ignore */ }
+    };
+    ipcRenderer.on(TTS_STATUS_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(TTS_STATUS_CHANNEL, listener);
+  }
+});
+
 contextBridge.exposeInMainWorld('store', Object.freeze(api));
 contextBridge.exposeInMainWorld('windowControls', windowControls);
 contextBridge.exposeInMainWorld('AssetService', assetService);
 contextBridge.exposeInMainWorld('TemplateService', templateService);
+contextBridge.exposeInMainWorld('tts', ttsApi);

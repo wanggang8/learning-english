@@ -11,6 +11,7 @@
 - ✅ 手动输入单词让学生背诵
 - ✅ 中国风红色主题界面
 - ✅ 背景音乐支持
+- ✅ 离线文字转语音（Phase 2.2.1，macOS / Windows）
 
 ## 文件结构
 
@@ -134,6 +135,49 @@ setTimeout(() => {
 - JavaScript（ES6+）
 - SheetJS（xlsx.js）- Excel文件解析
 - Electron + electron-store（持久化存储）
+- say（系统语音合成封装）
+
+## 离线语音合成（Phase 2.2.1）
+
+Phase 2.2.1 引入了离线文字转语音后端：主进程通过 `say` 库封装系统级语音合成（macOS 上调用 NSSpeechSynthesizer，Windows 上调用 SAPI），无需联网即可朗读文本。
+
+### API 概览（渲染进程可用的 window.tts）
+
+```js
+// 朗读文本
+const result = await window.tts.speak({ text: '欢迎来到单词小勇士！', rate: 1.1 });
+
+// 停止当前朗读并清空队列
+await window.tts.stop();
+
+// 查询系统可用的声音
+const voicesResult = await window.tts.getVoices();
+
+// 监听朗读状态变化（started / finished / cancelled / error）
+const unsubscribe = window.tts.onStatus((event) => {
+  console.log(event.status, event.requestId);
+});
+// 记得在不需要时取消订阅
+unsubscribe();
+```
+
+所有方法都会返回结构化结果 `{ success, ... }`，失败时会包含 `error` 描述与平台信息。`speak` 会自动排队避免并发播放，返回值中的 `status` 为 `queued` 或 `playing`，并附带 `requestId` 方便追踪。
+
+### 参数与限制
+
+- 文本最长 5000 字符，调用时会自动去除首尾空白。
+- `voice` 参数会严格校验，仅允许常见字符，避免通过语音名称执行命令。
+- 支持 `rate`（语速）范围 0.1 ~ 3.0，超出范围会被钳制。
+- `window.tts.stop()` 默认立即停止当前朗读并清空等待队列。
+- 可通过 `window.tts.onStatus` 订阅 `started` / `finished` / `cancelled` / `error` 等事件，便于更新 UI。
+
+### 平台支持
+
+- **macOS**：使用系统自带的 NSSpeechSynthesizer，无需额外依赖。
+- **Windows**：调用 Windows Speech API（SAPI），本地即可使用。
+- **其他平台**：当前发版未启用，若自行从源码运行，可额外安装 `espeak` / `festival` 后再尝试。
+
+该功能完全离线，不会将文本或音频上传到任何远程服务。
 
 ## Electron 桌面应用打包
 
