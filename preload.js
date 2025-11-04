@@ -62,6 +62,8 @@ const TTS_STATUS_CHANNEL = 'tts:status';
 const MAX_TTS_TEXT_LENGTH = 5000;
 const TTS_RATE_MIN = 0.1;
 const TTS_RATE_MAX = 3.0;
+const TTS_PITCH_MIN = 0.5;
+const TTS_PITCH_MAX = 2.0;
 const UNSAFE_VOICE_PATTERN = /[;&|><`$\\]/;
 const VOICE_NEWLINE_PATTERN = /[\r\n]/;
 
@@ -111,6 +113,15 @@ const sanitizeSpeakOptions = (input) => {
     }
     const clamped = clamp(numeric, TTS_RATE_MIN, TTS_RATE_MAX);
     sanitized.rate = Math.round(clamped * 1000) / 1000;
+  }
+
+  if (payload.pitch != null) {
+    const numeric = Number(payload.pitch);
+    if (!Number.isFinite(numeric)) {
+      return { success: false, error: 'invalid-pitch' };
+    }
+    const clamped = clamp(numeric, TTS_PITCH_MIN, TTS_PITCH_MAX);
+    sanitized.pitch = Math.round(clamped * 1000) / 1000;
   }
 
   return { success: true, value: sanitized };

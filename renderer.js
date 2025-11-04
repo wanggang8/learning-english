@@ -6,6 +6,7 @@ import './renderer/components/toast.js';
 import './renderer/components/loadingOverlay.js';
 // 导入模块
 import './renderer/modules/feedback.js';
+import './renderer/modules/ttsManager.js';
 import './renderer/modules/dataImporter.js';
 import './renderer/modules/drawStrategy.js';
 // 事件总线与命令

@@ -4,9 +4,13 @@
     SCREEN: 'flashcardScreen',
     CARD: 'flashcard',
     WORD: 'fcWord',
+    WORD_ROW: 'fcWordRow',
+    WORD_SPEAK_BTN: 'fcSpeakWordBtn',
     PHONETIC: 'fcPhonetic',
     DEF: 'fcDefinition',
     EX: 'fcExample',
+    EXAMPLE_ROW: 'fcExampleRow',
+    EXAMPLE_SPEAK_BTN: 'fcSpeakExampleBtn',
     IMG: 'fcImage',
     INDEX: 'fcIndex',
     COUNT: 'fcCount',
@@ -217,6 +221,36 @@
     const dEl = getEl(IDS.DEF); if (dEl) { dEl.textContent = def || ''; dEl.style.display = def ? '' : 'none'; }
     const eEl = getEl(IDS.EX); if (eEl) { eEl.textContent = ex || ''; eEl.style.display = ex ? '' : 'none'; }
 
+    const wordBtn = getEl(IDS.WORD_SPEAK_BTN);
+    if (wordBtn) {
+      const hasWord = Boolean(wordText);
+      wordBtn.disabled = !hasWord;
+      if (!hasWord) {
+        wordBtn.classList.remove('is-speaking', 'is-queued');
+        wordBtn.removeAttribute('aria-busy');
+        if (wordBtn.dataset.ttsRequestId) {
+          delete wordBtn.dataset.ttsRequestId;
+        }
+      }
+    }
+
+    const exampleRow = getEl(IDS.EXAMPLE_ROW);
+    const exampleBtn = getEl(IDS.EXAMPLE_SPEAK_BTN);
+    const hasExample = Boolean(ex);
+    if (exampleRow) {
+      exampleRow.style.display = hasExample ? '' : 'none';
+    }
+    if (exampleBtn) {
+      exampleBtn.disabled = !hasExample;
+      if (!hasExample) {
+        exampleBtn.classList.remove('is-speaking', 'is-queued');
+        exampleBtn.removeAttribute('aria-busy');
+        if (exampleBtn.dataset.ttsRequestId) {
+          delete exampleBtn.dataset.ttsRequestId;
+        }
+      }
+    }
+
     const imgEl = getEl(IDS.IMG);
     if (imgEl) {
       if (prefs.includeImages) {
@@ -246,6 +280,57 @@
 
     updateActionsUI(wordObj);
     updateSummary();
+  }
+
+  function speakCurrentWord() {
+    if (!window.TTSManager || typeof window.TTSManager.speakWord !== 'function') {
+      window.Feedback?.showWarning?.('语音播报不可用');
+      return;
+    }
+    const current = deck[index];
+    if (!current || !current.word) {
+      window.Feedback?.showWarning?.('当前卡片没有可朗读的单词');
+      return;
+    }
+    window.TTSManager.speakWord(current.word, {
+      button: getEl(IDS.WORD_SPEAK_BTN),
+      source: 'flashcard-word'
+    });
+  }
+
+  function speakExample() {
+    if (!window.TTSManager || typeof window.TTSManager.speakExample !== 'function') {
+      window.Feedback?.showWarning?.('语音播报不可用');
+      return;
+    }
+    const current = deck[index];
+    const exampleText = current?.example ? String(current.example).trim() : '';
+    if (!exampleText) {
+      window.Feedback?.showWarning?.('该卡片没有例句可朗读');
+      return;
+    }
+    window.TTSManager.speakExample(exampleText, {
+      button: getEl(IDS.EXAMPLE_SPEAK_BTN),
+      source: 'flashcard-example'
+    });
+  }
+
+  function maybeAutoRead(reason) {
+    if (!window.TTSManager || typeof window.TTSManager.isAutoPlayEnabled !== 'function') {
+      return;
+    }
+    if (!window.TTSManager.isAutoPlayEnabled()) {
+      return;
+    }
+    const current = deck[index];
+    if (!current || !current.word) {
+      return;
+    }
+    window.TTSManager.speakWord(current.word, {
+      button: getEl(IDS.WORD_SPEAK_BTN),
+      source: `flashcard-auto-${reason || 'advance'}`,
+      suppressQueuedToast: true
+    });
   }
 
   function ensureToolbarControls(screen) {
@@ -344,16 +429,22 @@
         <div class="flashcard-container">
           <div class="flashcard" id="${IDS.CARD}">
             <div class="face front">
-              <div class="fc-word" id="${IDS.WORD}"></div>
+              <div class="fc-word-row" id="${IDS.WORD_ROW}">
+                <div class="fc-word" id="${IDS.WORD}"></div>
+                <button class="tts-button fc-tts-btn" id="${IDS.WORD_SPEAK_BTN}" title="朗读单词">🔊</button>
+              </div>
               <div class="fc-phonetic" id="${IDS.PHONETIC}"></div>
             </div>
             <div class="face back">
               <div class="fc-definition" id="${IDS.DEF}"></div>
-              <div class="fc-example" id="${IDS.EX}"></div>
+              <div class="fc-example-row" id="${IDS.EXAMPLE_ROW}">
+                <div class="fc-example" id="${IDS.EX}"></div>
+                <button class="tts-button fc-tts-btn" id="${IDS.EXAMPLE_SPEAK_BTN}" title="朗读例句">🔊</button>
+              </div>
               <img class="fc-image" id="${IDS.IMG}" alt="" />
             </div>
           </div>
-        </div>
+
         <div class="flashcard-toolbar">
           <div class="fc-status"><span id="${IDS.INDEX}">0</span>/<span id="${IDS.COUNT}">0</span></div>
           <div class="fc-controls">
@@ -423,6 +514,8 @@
     getEl(IDS.PREV_BTN)?.addEventListener('click', prev);
     getEl(IDS.NEXT_BTN)?.addEventListener('click', next);
     getEl(IDS.FLIP_BTN)?.addEventListener('click', flip);
+    getEl(IDS.WORD_SPEAK_BTN)?.addEventListener('click', speakCurrentWord);
+    getEl(IDS.EXAMPLE_SPEAK_BTN)?.addEventListener('click', speakExample);
     getEl(IDS.ORDER_SELECT)?.addEventListener('change', (e) => {
       const val = e.target.value === 'ordered' ? 'ordered' : 'shuffled';
       prefs.order = val;
@@ -471,10 +564,11 @@
     renderCard();
     // 进入时也认为查看了当前卡片
     markReviewedForCurrent();
+    maybeAutoRead('open');
     activateScreen(IDS.SCREEN);
     // ensure actions are bound (in case screen existed in HTML)
     ensureToolbarControls(sc);
-  }
+    }
 
   function markReviewedForCurrent() {
     const cur = deck[index];
@@ -505,6 +599,7 @@
       setFaceByDefault();
       renderCard();
       markReviewedForCurrent();
+      maybeAutoRead('advance');
     }
   }
 
@@ -515,6 +610,7 @@
       setFaceByDefault();
       renderCard();
       markReviewedForCurrent();
+      maybeAutoRead('rewind');
     }
   }
 

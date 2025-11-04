@@ -16,6 +16,12 @@ const DEFAULT_STATE = {
       defaultFace: 'front',
       includeImages: true,
       filters: { mode: 'all', masteryMin: 0, masteryMax: 3 }
+    },
+    tts: {
+      voice: null,
+      rate: 1,
+      pitch: 1,
+      autoPlayOnAdvance: false
     }
   },
   // 会话历史：区分活动会话与归档会话
@@ -32,7 +38,7 @@ const DEFAULT_STATE = {
   metadata: {
     lastModified: null,
     version: '2.1.1',
-    schemaVersion: 3
+    schemaVersion: 4
   },
   importMetadata: {
     students: {
@@ -142,6 +148,17 @@ const schema = {
             },
             additionalProperties: true
           }
+        },
+        additionalProperties: true
+      },
+      tts: {
+        type: 'object',
+        default: DEFAULT_STATE.settings.tts,
+        properties: {
+          voice: { type: ['string', 'null'], default: null },
+          rate: { type: 'number', minimum: 0.1, maximum: 3, default: 1 },
+          pitch: { type: 'number', minimum: 0.5, maximum: 2, default: 1 },
+          autoPlayOnAdvance: { type: 'boolean', default: false }
         },
         additionalProperties: true
       }
@@ -361,7 +378,7 @@ function getDefaultValue(key) {
 }
 
 // Schema migration constants and helpers for enriched word objects
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 const WORD_DEFAULTS = Object.freeze({
   word: '',
@@ -374,6 +391,91 @@ const WORD_DEFAULTS = Object.freeze({
   lastReviewedAt: null,
   favorite: false
 });
+
+function clampNumber(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return fallback;
+  }
+  return Math.min(Math.max(num, min), max);
+}
+
+function normalizeTtsSettings(value) {
+  const base = DEFAULT_STATE.settings.tts;
+  if (!value || typeof value !== 'object') {
+    return { ...base };
+  }
+
+  const result = {
+    voice: base.voice,
+    rate: clampNumber(value.rate, 0.1, 3, base.rate),
+    pitch: clampNumber(value.pitch, 0.5, 2, base.pitch),
+    autoPlayOnAdvance: typeof value.autoPlayOnAdvance === 'boolean' ? value.autoPlayOnAdvance : base.autoPlayOnAdvance
+  };
+
+  if (Object.prototype.hasOwnProperty.call(value, 'voice')) {
+    if (typeof value.voice === 'string') {
+      const trimmed = value.voice.trim();
+      result.voice = trimmed ? trimmed : null;
+    } else if (value.voice === null) {
+      result.voice = null;
+    }
+  }
+
+  return result;
+}
+
+function normalizeFlashcardSettings(value) {
+  const base = DEFAULT_STATE.settings.flashcard;
+  const input = value && typeof value === 'object' ? value : {};
+  const baseFilters = base.filters || { mode: 'all', masteryMin: 0, masteryMax: 3 };
+  const rawFilters = input.filters && typeof input.filters === 'object' ? input.filters : {};
+  const modeCandidates = ['favorites', 'mastery', 'all'];
+  const mode = modeCandidates.includes(rawFilters.mode) ? rawFilters.mode : baseFilters.mode;
+  const min = clampNumber(rawFilters.masteryMin, 0, 3, baseFilters.masteryMin);
+  const max = clampNumber(rawFilters.masteryMax, 0, 3, baseFilters.masteryMax);
+  const rangeMin = Math.min(min, max);
+  const rangeMax = Math.max(min, max);
+
+  return {
+    ...base,
+    ...input,
+    order: input.order === 'ordered' ? 'ordered' : 'shuffled',
+    defaultFace: input.defaultFace === 'back' ? 'back' : 'front',
+    includeImages: typeof input.includeImages === 'boolean' ? input.includeImages : base.includeImages,
+    filters: {
+      ...baseFilters,
+      ...rawFilters,
+      mode,
+      masteryMin: rangeMin,
+      masteryMax: rangeMax
+    }
+  };
+}
+
+function normalizeSettings(value) {
+  const base = DEFAULT_STATE.settings;
+  const input = value && typeof value === 'object' ? value : {};
+
+  const normalized = {
+    ...base,
+    ...input,
+    flashcard: normalizeFlashcardSettings(input.flashcard),
+    tts: normalizeTtsSettings(input.tts)
+  };
+
+  normalized.volume = clampNumber(input.volume, 0, 1, base.volume);
+  normalized.musicEnabled = typeof input.musicEnabled === 'boolean' ? input.musicEnabled : base.musicEnabled;
+  normalized.animationDuration = clampNumber(input.animationDuration, 0, Number.MAX_SAFE_INTEGER, base.animationDuration);
+  normalized.playMode = typeof input.playMode === 'string' ? input.playMode : base.playMode;
+  normalized.drawMode = typeof input.drawMode === 'string' ? input.drawMode : base.drawMode;
+
+  if (Object.prototype.hasOwnProperty.call(input, 'lastUpdated')) {
+    normalized.lastUpdated = input.lastUpdated;
+  }
+
+  return normalized;
+}
 
 function normalizeWhitespace(value, { preserveNewlines = false } = {}) {
   if (value == null) return '';
@@ -636,7 +738,7 @@ function getState() {
       students: store.get('students', getDefaultValue('students')),
       words: normalizeWordsArray(store.get('words', getDefaultValue('words'))),
       studentStats: store.get('studentStats', getDefaultValue('studentStats')),
-      settings: store.get('settings', getDefaultValue('settings')),
+      settings: normalizeSettings(store.get('settings', getDefaultValue('settings'))),
       sessionHistory: store.get('sessionHistory', getDefaultValue('sessionHistory')),
       metadata: store.get('metadata', getDefaultValue('metadata')),
       importMetadata: store.get('importMetadata', getDefaultValue('importMetadata')),
@@ -658,6 +760,8 @@ function setState(nextState) {
         if (nextState[key] !== undefined) {
           if (key === 'words') {
             store.set('words', normalizeWordsArray(nextState[key]));
+          } else if (key === 'settings') {
+            store.set('settings', normalizeSettings(nextState[key]));
           } else {
             store.set(key, nextState[key]);
           }
@@ -686,6 +790,33 @@ function updatePartial(updates) {
 
         if (key === 'words') {
           store.set('words', normalizeWordsArray(value));
+          return;
+        }
+
+        if (key === 'settings' && value && typeof value === 'object') {
+          const current = normalizeSettings(store.get('settings', getDefaultValue('settings')));
+          const patchSettings = { ...value };
+          if (patchSettings.flashcard && typeof patchSettings.flashcard === 'object') {
+            const mergedFlashcard = {
+              ...current.flashcard,
+              ...patchSettings.flashcard
+            };
+            if (patchSettings.flashcard.filters && typeof patchSettings.flashcard.filters === 'object') {
+              mergedFlashcard.filters = {
+                ...current.flashcard.filters,
+                ...patchSettings.flashcard.filters
+              };
+            }
+            patchSettings.flashcard = mergedFlashcard;
+          }
+          if (patchSettings.tts && typeof patchSettings.tts === 'object') {
+            patchSettings.tts = {
+              ...current.tts,
+              ...patchSettings.tts
+            };
+          }
+          const merged = normalizeSettings({ ...current, ...patchSettings });
+          store.set('settings', merged);
           return;
         }
 
@@ -813,7 +944,7 @@ function getSettings() {
   return runWithFallback(
     'getSettings',
     getDefaultValue('settings'),
-    () => store.get('settings', getDefaultValue('settings'))
+    () => normalizeSettings(store.get('settings', getDefaultValue('settings')))
   );
 }
 
@@ -826,13 +957,37 @@ function updateSettings(newSettings) {
         throw new Error('newSettings 必须为对象');
       }
 
-      const currentSettings = store.get('settings', getDefaultValue('settings'));
-      const nextSettings = {
+      const currentSettings = normalizeSettings(store.get('settings', getDefaultValue('settings')));
+      const patch = { ...newSettings };
+
+      if (patch.flashcard && typeof patch.flashcard === 'object') {
+        const mergedFlashcard = {
+          ...currentSettings.flashcard,
+          ...patch.flashcard
+        };
+        if (patch.flashcard.filters && typeof patch.flashcard.filters === 'object') {
+          mergedFlashcard.filters = {
+            ...currentSettings.flashcard.filters,
+            ...patch.flashcard.filters
+          };
+        }
+        patch.flashcard = mergedFlashcard;
+      }
+
+      if (patch.tts && typeof patch.tts === 'object') {
+        patch.tts = {
+          ...currentSettings.tts,
+          ...patch.tts
+        };
+      }
+
+      const nextSettingsRaw = {
         ...currentSettings,
-        ...newSettings,
+        ...patch,
         lastUpdated: new Date().toISOString()
       };
-      store.set('settings', nextSettings);
+      const normalized = normalizeSettings(nextSettingsRaw);
+      store.set('settings', normalized);
       touchMetadata();
       return { success: true };
     }

@@ -833,8 +833,72 @@ function displayWord(word) {
 
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item';
-    const text = (word && typeof word === 'object') ? (word.word || '') : String(word || '');
-    wordItem.textContent = text;
+
+    const wordText = (word && typeof word === 'object') ? (word.word || '') : String(word || '');
+    const displayText = wordText || '（无单词）';
+    const exampleText = (word && typeof word === 'object' && word.example)
+        ? String(word.example).trim()
+        : '';
+
+    const topRow = document.createElement('div');
+    topRow.className = 'word-item-top';
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'word-item-text';
+    textSpan.textContent = displayText;
+
+    const actions = document.createElement('div');
+    actions.className = 'word-tts-actions';
+
+    const speakBtn = document.createElement('button');
+    speakBtn.type = 'button';
+    speakBtn.className = 'tts-button word-tts-btn';
+    speakBtn.title = '朗读单词';
+    speakBtn.textContent = '🔊';
+    if (!wordText) {
+        speakBtn.disabled = true;
+    } else if (window.TTSManager && typeof window.TTSManager.speakWord === 'function') {
+        speakBtn.addEventListener('click', () => {
+            window.TTSManager.speakWord(wordText, {
+                button: speakBtn,
+                source: 'word-screen'
+            });
+        });
+    } else {
+        speakBtn.disabled = true;
+    }
+    actions.appendChild(speakBtn);
+
+    if (exampleText) {
+        const exampleBtn = document.createElement('button');
+        exampleBtn.type = 'button';
+        exampleBtn.className = 'tts-button word-tts-btn word-tts-example';
+        exampleBtn.title = '朗读例句';
+        exampleBtn.textContent = '🗣️';
+        if (window.TTSManager && typeof window.TTSManager.speakExample === 'function') {
+            exampleBtn.addEventListener('click', () => {
+                window.TTSManager.speakExample(exampleText, {
+                    button: exampleBtn,
+                    source: 'word-screen-example'
+                });
+            });
+        } else {
+            exampleBtn.disabled = true;
+        }
+        actions.appendChild(exampleBtn);
+    }
+
+    topRow.appendChild(textSpan);
+    topRow.appendChild(actions);
+    wordItem.appendChild(topRow);
+
+    if (exampleText) {
+        const exampleTextEl = document.createElement('div');
+        exampleTextEl.className = 'word-item-example-text';
+        exampleTextEl.textContent = exampleText;
+        wordItem.appendChild(exampleTextEl);
+    }
+
     wordGrid.appendChild(wordItem);
 
     switchScreen('wordScreen');

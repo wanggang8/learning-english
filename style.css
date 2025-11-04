@@ -221,20 +221,65 @@ body {
     background: linear-gradient(135deg, #fff 0%, #fff5e6 100%);
     border: 6px solid #ffd93d;
     border-radius: 25px;
-    padding: 3rem 2rem;
+    padding: 2.5rem 2rem;
+    box-shadow:
+        0 10px 30px rgba(255,217,61,0.4),
+        inset 0 0 30px rgba(255,255,255,0.5);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.2rem;
+    animation: wordAppear 0.5s ease-out backwards;
+}
+
+.word-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.word-item-text {
     font-size: 4rem;
     font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive, sans-serif;
+    font-weight: bold;
     background: linear-gradient(45deg, #ff6b9d, #ffd93d, #6bcf7f, #4d96ff);
     background-size: 300% 300%;
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     background-clip: text;
-    font-weight: bold;
-    box-shadow: 
-        0 10px 30px rgba(255,217,61,0.4),
-        inset 0 0 30px rgba(255,255,255,0.5);
-    animation: wordAppear 0.5s ease-out backwards, rainbowText 5s ease infinite;
-    position: relative;
+    -webkit-text-fill-color: transparent;
+    text-align: center;
+    animation: rainbowText 5s ease infinite;
+    margin: 0;
+    display: inline-block;
+}
+
+.word-tts-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.word-tts-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1.4rem;
+}
+
+.word-tts-btn.word-tts-example {
+    font-size: 1.3rem;
+}
+
+.word-item-example-text {
+    font-size: 1.15rem;
+    color: #1f2937;
+    text-align: center;
+    max-width: 90%;
+    line-height: 1.5;
+    margin-top: 0.2rem;
 }
 
 .word-item::before {
@@ -620,6 +665,87 @@ body.fullscreen-active .container {
     outline: none;
     border-color: #ff6b9d;
     box-shadow: 0 0 6px rgba(255, 107, 157, 0.4);
+}
+
+.tts-voice-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#ttsVoiceSelect {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    border: 2px solid #4d96ff;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.95rem;
+}
+
+#ttsVoiceSelect:disabled {
+    opacity: 0.6;
+}
+
+.tts-refresh-btn {
+    border: 2px solid #4d96ff;
+    background: #fff;
+    border-radius: 10px;
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.tts-refresh-btn:hover:not(:disabled) {
+    transform: rotate(20deg);
+}
+
+.tts-refresh-btn.is-busy {
+    cursor: wait;
+    opacity: 0.6;
+    animation: ttsRefreshSpin 1s linear infinite;
+}
+
+@keyframes ttsRefreshSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+#ttsRateSlider,
+#ttsPitchSlider {
+    width: 100%;
+    accent-color: #4d96ff;
+}
+
+.tts-inline-value {
+    color: #1e3a8a;
+    margin-left: 0.3rem;
+    font-size: 0.9rem;
+}
+
+.tts-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.tts-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #4d96ff;
+}
+
+.tts-hint {
+    font-size: 0.8rem;
+    color: #555;
+    display: block;
+    margin-top: -0.2rem;
 }
 
 /* 文件上传提示框样式 */
@@ -1080,6 +1206,52 @@ button:disabled,
     filter: grayscale(10%);
 }
 
+.tts-button {
+    background: #fff;
+    border: 2px solid #4d96ff;
+    color: #1e3a8a;
+    border-radius: 999px;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(77,150,255,0.2);
+}
+
+.tts-button:hover:not(:disabled) {
+    transform: translateY(-1px) scale(1.05);
+    box-shadow: 0 6px 16px rgba(77,150,255,0.35);
+}
+
+.tts-button.is-speaking {
+    animation: ttsPulse 0.8s ease-in-out infinite alternate;
+}
+
+.tts-button.is-queued {
+    border-style: dashed;
+}
+
+.tts-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    animation: none;
+}
+
+@keyframes ttsPulse {
+    from {
+        transform: scale(0.96);
+        box-shadow: 0 0 0 0 rgba(77,150,255,0.3);
+    }
+    to {
+        transform: scale(1.04);
+        box-shadow: 0 0 0 6px rgba(77,150,255,0);
+    }
+}
+
 /* =====================
    Flashcard 组件样式
    ===================== */
@@ -1138,6 +1310,33 @@ button:disabled,
     margin-bottom: 0.4rem;
 }
 
+.fc-word-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+}
+
+.fc-example-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    margin-top: 0.6rem;
+}
+
+.fc-example-row .fc-example {
+    flex: 1;
+}
+
+.fc-tts-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 1.1rem;
+}
+
 .fc-phonetic { color: #666; font-size: 1.2rem; margin-top: 0.3rem; }
 
 .fc-definition { color: #1f2937; font-size: 1.2rem; margin-bottom: 0.5rem; text-align: center; }
@@ -1181,4 +1380,7 @@ button:disabled,
 @media (max-width: 768px) {
   .flashcard { width: 90%; height: 280px; }
   .fc-word { font-size: 2.2rem; }
+  .word-item-text { font-size: 2.8rem; }
+  .word-item-example-text { font-size: 1rem; }
+  .word-tts-btn { width: 42px; height: 42px; }
 }

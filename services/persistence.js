@@ -60,6 +60,112 @@ function execute(operation, handler, fallback) {
   }
 }
 
+const SETTINGS_DEFAULTS = Object.freeze({
+  musicEnabled: true,
+  animationDuration: 2000,
+  lastUpdated: null,
+  volume: 1,
+  playMode: 'loop',
+  drawMode: 'random',
+  flashcard: {
+    order: 'shuffled',
+    defaultFace: 'front',
+    includeImages: true,
+    filters: { mode: 'all', masteryMin: 0, masteryMax: 3 }
+  },
+  tts: {
+    voice: null,
+    rate: 1,
+    pitch: 1,
+    autoPlayOnAdvance: false
+  }
+});
+
+function clampNumber(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return fallback;
+  }
+  return Math.min(Math.max(num, min), max);
+}
+
+function normalizeTtsSettings(value) {
+  const base = SETTINGS_DEFAULTS.tts;
+  if (!value || typeof value !== 'object') {
+    return { ...base };
+  }
+
+  const result = {
+    voice: base.voice,
+    rate: clampNumber(value.rate, 0.1, 3, base.rate),
+    pitch: clampNumber(value.pitch, 0.5, 2, base.pitch),
+    autoPlayOnAdvance: typeof value.autoPlayOnAdvance === 'boolean' ? value.autoPlayOnAdvance : base.autoPlayOnAdvance
+  };
+
+  if (Object.prototype.hasOwnProperty.call(value, 'voice')) {
+    if (typeof value.voice === 'string') {
+      const trimmed = value.voice.trim();
+      result.voice = trimmed ? trimmed : null;
+    } else if (value.voice === null) {
+      result.voice = null;
+    }
+  }
+
+  return result;
+}
+
+function normalizeFlashcardSettings(value) {
+  const base = SETTINGS_DEFAULTS.flashcard;
+  const input = value && typeof value === 'object' ? value : {};
+  const baseFilters = base.filters || { mode: 'all', masteryMin: 0, masteryMax: 3 };
+  const rawFilters = input.filters && typeof input.filters === 'object' ? input.filters : {};
+  const modeCandidates = ['favorites', 'mastery', 'all'];
+  const mode = modeCandidates.includes(rawFilters.mode) ? rawFilters.mode : baseFilters.mode;
+  const min = clampNumber(rawFilters.masteryMin, 0, 3, baseFilters.masteryMin);
+  const max = clampNumber(rawFilters.masteryMax, 0, 3, baseFilters.masteryMax);
+  const rangeMin = Math.min(min, max);
+  const rangeMax = Math.max(min, max);
+
+  return {
+    ...base,
+    ...input,
+    order: input.order === 'ordered' ? 'ordered' : 'shuffled',
+    defaultFace: input.defaultFace === 'back' ? 'back' : 'front',
+    includeImages: typeof input.includeImages === 'boolean' ? input.includeImages : base.includeImages,
+    filters: {
+      ...baseFilters,
+      ...rawFilters,
+      mode,
+      masteryMin: rangeMin,
+      masteryMax: rangeMax
+    }
+  };
+}
+
+function normalizeSettings(value) {
+  const base = SETTINGS_DEFAULTS;
+  const input = value && typeof value === 'object' ? value : {};
+
+  const normalized = {
+    ...base,
+    ...input,
+    flashcard: normalizeFlashcardSettings(input.flashcard),
+    tts: normalizeTtsSettings(input.tts)
+  };
+
+  normalized.volume = clampNumber(input.volume, 0, 1, base.volume);
+  normalized.musicEnabled = typeof input.musicEnabled === 'boolean' ? input.musicEnabled : base.musicEnabled;
+  normalized.animationDuration = clampNumber(input.animationDuration, 0, Number.MAX_SAFE_INTEGER, base.animationDuration);
+  normalized.playMode = typeof input.playMode === 'string' ? input.playMode : base.playMode;
+  normalized.drawMode = typeof input.drawMode === 'string' ? input.drawMode : base.drawMode;
+
+  if (Object.prototype.hasOwnProperty.call(input, 'lastUpdated')) {
+    normalized.lastUpdated = input.lastUpdated;
+  }
+
+  return normalized;
+}
+
 // Normalization helpers for enriched word objects (backward compatible)
 const WORD_DEFAULTS = Object.freeze({
   word: '',
@@ -166,8 +272,11 @@ function normalizeWordsArray(list) {
 function getState() {
   return execute('getState', (api) => {
     const state = api.getState();
-    if (state && Array.isArray(state.words)) {
-      state.words = normalizeWordsArray(state.words);
+    if (state && typeof state === 'object') {
+      if (Array.isArray(state.words)) {
+        state.words = normalizeWordsArray(state.words);
+      }
+      state.settings = normalizeSettings(state.settings);
     }
     return {
       success: true,
@@ -181,6 +290,9 @@ function setState(state) {
     const next = (state && typeof state === 'object') ? { ...state } : state;
     if (next && Array.isArray(next.words)) {
       next.words = normalizeWordsArray(next.words);
+    }
+    if (next && next.settings) {
+      next.settings = normalizeSettings(next.settings);
     }
     return api.setState(next);
   });
@@ -203,6 +315,31 @@ function updatePartial(updates) {
     }
     if (patch && Array.isArray(patch.words)) {
       patch = { ...patch, words: normalizeWordsArray(patch.words) };
+    }
+    if (patch && patch.settings && typeof patch.settings === 'object') {
+      const currentSettings = normalizeSettings(api.getSettings());
+      const patchSettings = { ...patch.settings };
+      if (patchSettings.flashcard && typeof patchSettings.flashcard === 'object') {
+        const mergedFlashcard = {
+          ...currentSettings.flashcard,
+          ...patchSettings.flashcard
+        };
+        if (patchSettings.flashcard.filters && typeof patchSettings.flashcard.filters === 'object') {
+          mergedFlashcard.filters = {
+            ...currentSettings.flashcard.filters,
+            ...patchSettings.flashcard.filters
+          };
+        }
+        patchSettings.flashcard = mergedFlashcard;
+      }
+      if (patchSettings.tts && typeof patchSettings.tts === 'object') {
+        patchSettings.tts = {
+          ...currentSettings.tts,
+          ...patchSettings.tts
+        };
+      }
+      const mergedSettings = normalizeSettings({ ...currentSettings, ...patchSettings });
+      patch = { ...patch, settings: mergedSettings };
     }
     return api.updatePartial(patch);
   });
@@ -230,7 +367,7 @@ function clearHistory(options = { scope: 'current' }) {
 
 function getSettings() {
   return execute('getSettings', (api) => {
-    const settings = api.getSettings();
+    const settings = normalizeSettings(api.getSettings());
     return {
       success: true,
       data: settings
