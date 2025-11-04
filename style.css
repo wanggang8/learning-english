@@ -322,6 +322,13 @@ body {
     font-size: 1.5rem;
 }
 
+.btn-template {
+    background: linear-gradient(135deg, #4d96ff, #6bcf7f);
+}
+.btn-template::before {
+    content: '📘';
+}
+
 .btn-back {
     background: linear-gradient(135deg, #a78bfa, #ec4899);
     color: white;
@@ -676,8 +683,23 @@ body.fullscreen-active .container {
     font-size: 0.9rem;
 }
 
+.prompt-help {
+    margin-top: 1rem;
+    color: #444;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-align: left;
+}
+.prompt-help p {
+    margin-bottom: 0.4rem;
+}
+.prompt-help p:last-child {
+    margin-bottom: 0;
+}
+
 .prompt-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     justify-content: center;
     margin-top: 1.5rem;

@@ -170,24 +170,62 @@ function resetExcludedStudents({ silent = false } = {}) {
 
 function _normalizeWordEntry(entry) {
     if (entry == null) return null;
+    const normalizeWhitespaceFn = window.DataImporter?.utils?.normalizeWhitespace;
+    const sanitizeTagsFn = window.DataImporter?.utils?.sanitizeTags;
+    const normalizeInline = (value) => {
+        if (normalizeWhitespaceFn) {
+            return normalizeWhitespaceFn(value);
+        }
+        return String(value ?? '').trim();
+    };
+
     if (typeof entry === 'string' || typeof entry === 'number') {
-        const w = String(entry).trim();
+        const w = normalizeInline(entry);
         if (!w) return null;
         return { word: w, phonetic: null, definition: null, example: null, tags: [], imagePath: null, mastery: 0, lastReviewedAt: null, favorite: false };
     }
     if (typeof entry === 'object') {
         const base = { word: '', phonetic: null, definition: null, example: null, tags: [], imagePath: null, mastery: 0, lastReviewedAt: null, favorite: false };
-        const word = typeof entry.word === 'string' ? entry.word
+        const wordCandidate = typeof entry.word === 'string' ? entry.word
             : typeof entry.text === 'string' ? entry.text
             : typeof entry.value === 'string' ? entry.value
             : typeof entry.term === 'string' ? entry.term : '';
-        const normalized = { ...base, ...entry, word: String(word || '').trim() };
-        if (!Array.isArray(entry.tags)) normalized.tags = Array.isArray(entry.tags) ? entry.tags : [];
-        else normalized.tags = entry.tags.filter((t)=>t!=null).map((t)=>String(t));
+        const normalized = { ...base, ...entry, word: normalizeInline(wordCandidate) };
+
+        const tagsSource = entry.tags ?? entry.tag ?? entry.category ?? entry.categories;
+        if (sanitizeTagsFn) {
+            normalized.tags = sanitizeTagsFn(tagsSource);
+        } else if (Array.isArray(tagsSource)) {
+            normalized.tags = tagsSource.filter((t) => t != null).map((t) => String(t));
+        } else if (typeof tagsSource === 'string') {
+            normalized.tags = tagsSource.split(/[\n,，;；|｜\/\\]+/).map((t) => t.trim()).filter(Boolean);
+        } else {
+            normalized.tags = [];
+        }
+
         const m = Number(entry.mastery);
         normalized.mastery = Number.isFinite(m) ? m : 0;
         normalized.favorite = Boolean(entry.favorite);
-        ['phonetic','definition','example','imagePath'].forEach((k)=>{ normalized[k] = normalized[k] == null ? null : String(normalized[k]); });
+
+        normalized.phonetic = normalized.phonetic == null ? null : normalizeInline(normalized.phonetic);
+        const normalizeMultiline = (value) => {
+            if (normalizeWhitespaceFn) {
+                return normalizeWhitespaceFn(value, { preserveNewlines: true });
+            }
+            return String(value ?? '').trim();
+        };
+        normalized.definition = normalized.definition == null ? null : normalizeMultiline(normalized.definition);
+        normalized.example = normalized.example == null ? null : normalizeMultiline(normalized.example);
+
+        const imageSource = entry.imagePath ?? entry.image ?? entry.img ?? entry.picture ?? entry['image path'];
+        normalized.imagePath = imageSource == null ? null : normalizeInline(imageSource);
+
+        if (normalized.lastReviewedAt != null) {
+            normalized.lastReviewedAt = String(normalized.lastReviewedAt);
+        } else {
+            normalized.lastReviewedAt = null;
+        }
+
         if (!normalized.word) return null;
         return normalized;
     }
@@ -393,16 +431,21 @@ function showFileUploadPrompt() {
         <div class="prompt-field">
             <label>1. 学生名单 Excel：</label>
             <input type="file" id="studentsFileInput" accept=".xlsx,.xls">
-            <small>格式：第一列为“姓名”，第一行为表头</small>
+            <small>格式：第一列为“姓名”，第一行为表头；可选列将被自动忽略</small>
         </div>
         <div class="prompt-field">
             <label>2. 单词列表 Excel：</label>
             <input type="file" id="wordsFileInput" accept=".xlsx,.xls">
-            <small>格式：第一列为“单词”，第一行为表头</small>
+            <small>基础格式：第一列为“单词”，第一行为表头。可选列：音标、释义、例句、标签、图片（可留空）。</small>
+        </div>
+        <div class="prompt-help">
+            <p>标签可使用中文/英文逗号、分号或换行分隔；图片列支持本地路径或网络图片。</p>
+            <p>如仅提供“单词”列也可以导入，我们会自动填充默认值。</p>
         </div>
         <div class="prompt-actions">
             <button id="loadExcelBtn" class="btn-primary">确定</button>
             <button id="useTestDataBtn" class="btn-secondary">使用测试数据</button>
+            <button id="openTemplateBtn" class="btn-secondary btn-template">模板示例</button>
         </div>
     `;
 
@@ -410,6 +453,49 @@ function showFileUploadPrompt() {
 
     document.getElementById('loadExcelBtn').addEventListener('click', loadBothExcelFiles);
     document.getElementById('useTestDataBtn').addEventListener('click', useTestData);
+    document.getElementById('openTemplateBtn')?.addEventListener('click', openTemplateWorkbook);
+}
+
+async function openTemplateWorkbook() {
+    const button = document.getElementById('openTemplateBtn');
+    const originalText = button?.textContent;
+    const setBusy = (busy) => {
+        if (!button) return;
+        if (busy) {
+            button.disabled = true;
+            button.classList.add('loading');
+            button.textContent = '打开中...';
+        } else {
+            if (!document.body.contains(button)) return;
+            button.disabled = false;
+            button.classList.remove('loading');
+            button.textContent = originalText || '模板示例';
+        }
+    };
+
+    const showManualHint = () => {
+        window.Feedback?.showInfo?.('请在 data/ 目录中手动打开 “单词列表.xlsx” 模板。');
+    };
+
+    try {
+        setBusy(true);
+        if (!window.TemplateService || typeof window.TemplateService.openWordsWorkbook !== 'function') {
+            showManualHint();
+            return;
+        }
+        const result = await window.TemplateService.openWordsWorkbook();
+        const templatePath = result?.path || 'data/单词列表.xlsx';
+        if (result && result.success) {
+            window.Feedback?.showSuccess?.(`已打开“单词列表.xlsx”模板。\n路径：${templatePath}`);
+        } else {
+            const reason = result?.error || '未知错误';
+            window.Feedback?.showError?.(`无法打开模板：${reason}\n可手动打开：${templatePath}`);
+        }
+    } catch (error) {
+        window.Feedback?.showError?.(`无法打开模板：${error.message}`);
+    } finally {
+        setBusy(false);
+    }
 }
 
 async function loadBothExcelFiles() {
@@ -497,35 +583,133 @@ async function loadBothExcelFiles() {
 
 async function useTestData() {
     const testStudents = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十'];
-    const testWords = ['apple', 'banana', 'cat', 'dog', 'elephant', 'fish', 'grape', 'house', 'ice', 'juice'];
+    const createTestWord = (word, extra = {}) => ({
+        word,
+        phonetic: null,
+        definition: null,
+        example: null,
+        tags: [],
+        imagePath: null,
+        mastery: 0,
+        lastReviewedAt: null,
+        favorite: false,
+        ...extra
+    });
+    const testWordsRaw = [
+        createTestWord('apple', {
+            phonetic: '/ˈæpl/',
+            definition: 'n. 苹果；苹果树',
+            example: 'An apple a day keeps the doctor away.',
+            tags: ['水果', '基础词汇']
+        }),
+        createTestWord('brave', {
+            phonetic: '/breɪv/',
+            definition: 'adj. 勇敢的；无畏的',
+            example: 'The brave student volunteered to lead the team.',
+            tags: ['品格', '励志']
+        }),
+        createTestWord('crystal', {
+            phonetic: '/ˈkrɪstl/',
+            definition: 'n. 水晶；晶体',
+            example: 'The snowflake looked like a delicate crystal.',
+            tags: ['自然', '形状']
+        }),
+        createTestWord('explore', {
+            phonetic: '/ɪkˈsplɔːr/',
+            definition: 'v. 探索；研究',
+            example: 'Let’s explore a new English story together.',
+            tags: ['动词', '课堂任务']
+        }),
+        createTestWord('harmony', {
+            phonetic: '/ˈhɑːrməni/',
+            definition: 'n. 和谐；融洽',
+            example: 'Music brings harmony to the classroom.',
+            tags: ['情感', '音乐']
+        }),
+        createTestWord('lantern', {
+            phonetic: '/ˈlæntərn/',
+            definition: 'n. 灯笼；提灯',
+            example: 'We made a paper lantern for the festival.',
+            tags: ['节日', '手工制作']
+        }),
+        createTestWord('mountain', {
+            phonetic: '/ˈmaʊntn/',
+            definition: 'n. 山；高山',
+            example: 'The mountain is covered with white snow.',
+            tags: ['自然', '地理']
+        }),
+        createTestWord('ocean', {
+            phonetic: '/ˈoʊʃn/',
+            definition: 'n. 海洋；大海',
+            example: 'Whales live in the deep ocean.',
+            tags: ['自然', '动物']
+        }),
+        createTestWord('puzzle', {
+            phonetic: '/ˈpʌzl/',
+            definition: 'n. 谜题；拼图',
+            example: 'This word puzzle is so much fun!',
+            tags: ['游戏', '课堂活动']
+        }),
+        createTestWord('sparkle', {
+            phonetic: '/ˈspɑːrkl/',
+            definition: 'v. 闪耀；发光',
+            example: 'The stars sparkle brightly at night.',
+            tags: ['自然', '动词']
+        })
+    ];
+
+    const normalizeName = window.DataImporter?.utils?.normalizeWhitespace
+        ? (value) => window.DataImporter.utils.normalizeWhitespace(value)
+        : (value) => String(value ?? '').trim();
+
+    const normalizedStudents = (() => {
+        const seen = new Set();
+        const result = [];
+        for (const name of testStudents) {
+            const normalized = normalizeName(name);
+            if (!normalized || seen.has(normalized)) continue;
+            seen.add(normalized);
+            result.push(normalized);
+        }
+        return result;
+    })();
+
+    const normalizedWords = (() => {
+        if (window.DataImporter?.utils?.normalizeWordListForImport) {
+            return window.DataImporter.utils.normalizeWordListForImport(testWordsRaw);
+        }
+        return testWordsRaw.map((entry) => ({ ...entry }));
+    })();
 
     if (!window.DataImporter) {
-        setStudents(testStudents);
-        setWords(testWords);
+        setStudents(normalizedStudents);
+        setWords(normalizedWords);
         const prompt = document.getElementById('filePrompt');
         if (prompt) {
             prompt.remove();
         }
-        window.Feedback?.showSuccess('✅ 已加载测试数据\n学生: 8名\n单词: 10个');
+        window.Feedback?.showSuccess(`✅ 已加载测试数据\n学生: ${normalizedStudents.length} 名\n单词: ${normalizedWords.length} 个（含释义/标签示例）`);
         return;
     }
 
     try {
         const [studentsResult, wordsResult] = await Promise.all([
-            window.DataImporter.importTestData(testStudents, window.DataImporter.DATA_TYPES.STUDENTS),
-            window.DataImporter.importTestData(testWords, window.DataImporter.DATA_TYPES.WORDS)
+            window.DataImporter.importTestData(normalizedStudents, window.DataImporter.DATA_TYPES.STUDENTS),
+            window.DataImporter.importTestData(normalizedWords, window.DataImporter.DATA_TYPES.WORDS)
         ]);
 
         if (studentsResult.success && wordsResult.success) {
-            setStudents(testStudents);
-            setWords(testWords);
+            setStudents(normalizedStudents);
+            setWords(normalizedWords);
 
             const prompt = document.getElementById('filePrompt');
             if (prompt) {
                 prompt.remove();
             }
 
-            window.Feedback?.showSuccess('✅ 测试数据已自动保存！\n学生: 8名\n单词: 10个');
+            window.Feedback?.showSuccess(
+                `✅ 测试数据已自动保存！\n学生: ${normalizedStudents.length} 名\n单词: ${normalizedWords.length} 个（含音标/释义/标签示例）`
+            );
 
             console.log('成功导入测试数据');
         } else {
