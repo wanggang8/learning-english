@@ -156,6 +156,43 @@
     } catch (e) { console.error('ttsStop failed', e); }
   }
 
+  // Learning mode commands
+  function learningStart() {
+    try {
+      const stateRes = window.PersistenceService?.getState();
+      const words = stateRes && stateRes.success && Array.isArray(stateRes.data?.words) ? stateRes.data.words : [];
+      if (!words.length) {
+        window.Feedback?.showToast('请先导入单词列表', window.Feedback?.TOAST_TYPES?.INFO || 'info', 3000);
+        try { window.showFileUploadPrompt && window.showFileUploadPrompt(); } catch(e) {}
+        return;
+      }
+    } catch (e) {}
+    try { window.switchToLearningMode && window.switchToLearningMode(); } catch (e) { console.error('learningStart failed', e); }
+  }
+
+  function learningSession(mode, options = {}) {
+    try {
+      if (!window.LearningMode) {
+        throw new Error('LearningMode module not available');
+      }
+      const result = window.LearningMode.startSession(mode, options);
+      if (!result.success) {
+        window.Feedback?.showError(result.error);
+      }
+    } catch (e) { console.error('learningSession failed', e); }
+  }
+
+  function learningExit() {
+    try {
+      if (window.LearningMode) {
+        const result = window.LearningMode.exitSession();
+        if (!result.success) {
+          window.Feedback?.showError(result.error);
+        }
+      }
+    } catch (e) { console.error('learningExit failed', e); }
+  }
+
   // 将命令暴露给其他模块（如 keyboardManager）
   window.AppCommands = Object.freeze({
     getActiveScreenId,
@@ -176,6 +213,10 @@
     flashcardFlip,
     flashcardNext,
     flashcardPrev,
+    // learning mode
+    learningStart,
+    learningSession,
+    learningExit,
     // tts
     ttsStop
   });
@@ -203,6 +244,10 @@
     window.AppEvents.on('flashcard:flip', flashcardFlip);
     window.AppEvents.on('flashcard:next', flashcardNext);
     window.AppEvents.on('flashcard:prev', flashcardPrev);
+    // Learning mode events
+    window.AppEvents.on('learning:start', learningStart);
+    window.AppEvents.on('learning:session', learningSession);
+    window.AppEvents.on('learning:exit', learningExit);
     // TTS events
     window.AppEvents.on('tts:stop', ttsStop);
   }

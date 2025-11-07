@@ -27,7 +27,42 @@
             <!-- 初始页面 -->
             <div id="startScreen" class="screen active">
                 <h1 class="title">🌟 单词小勇士 🌟</h1>
-                <button class="btn-primary" onclick="startDrawing()">开始冒险</button>
+                <div class="mode-tabs">
+                    <button class="tab-btn active" id="drawTabBtn" onclick="switchToDrawMode()">抽取模式</button>
+                    <button class="tab-btn" id="learningTabBtn" onclick="switchToLearningMode()">学习模式</button>
+                </div>
+                <div class="mode-content">
+                    <div id="drawModeContent" class="mode-panel active">
+                        <button class="btn-primary" onclick="startDrawing()">开始冒险</button>
+                    </div>
+                    <div id="learningModeContent" class="mode-panel">
+                        <div class="learning-deck-selector">
+                            <h3>选择学习卡组</h3>
+                            <div class="deck-options">
+                                <button class="deck-btn" onclick="startLearningSession('all')">
+                                    <span class="deck-icon">📚</span>
+                                    <span class="deck-title">全部单词</span>
+                                    <span class="deck-desc">学习所有导入的单词</span>
+                                </button>
+                                <button class="deck-btn" onclick="startLearningSession('favorites')">
+                                    <span class="deck-icon">⭐</span>
+                                    <span class="deck-title">收藏单词</span>
+                                    <span class="deck-desc">只学习已收藏的单词</span>
+                                </button>
+                                <button class="deck-btn" onclick="startLearningSession('mastery')">
+                                    <span class="deck-icon">🎯</span>
+                                    <span class="deck-title">掌握度筛选</span>
+                                    <span class="deck-desc">按掌握度范围学习</span>
+                                </button>
+                                <button class="deck-btn" onclick="startLearningSession('tags')">
+                                    <span class="deck-icon">🏷️</span>
+                                    <span class="deck-title">标签筛选</span>
+                                    <span class="deck-desc">按标签分类学习</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div style="margin-top: 1rem;">
                   <button class="btn-secondary" id="flashcardOpenBtn" onclick="openFlashcards()">学习卡片</button>
                 </div>
