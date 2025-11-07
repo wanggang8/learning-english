@@ -722,6 +722,23 @@ async function useTestData() {
 }
 
 function switchScreen(screenId) {
+    // Cancel any ongoing TTS when switching screens
+    if (window.TTSController && typeof window.TTSController.cancelNavigationSpeech === 'function') {
+        window.TTSController.cancelNavigationSpeech();
+    }
+    
+    // Set active mode in TTSController
+    if (window.TTSController && typeof window.TTSController.setActiveMode === 'function') {
+        const modeMap = {
+            'startScreen': 'drawing',
+            'drawingScreen': 'drawing', 
+            'resultScreen': 'result',
+            'wordScreen': 'word',
+            'flashcardScreen': 'flashcard'
+        };
+        window.TTSController.setActiveMode(modeMap[screenId] || null);
+    }
+    
     document.querySelectorAll('.screen').forEach((screen) => {
         screen.classList.remove('active');
     });
@@ -857,6 +874,14 @@ function displayWord(word) {
     speakBtn.textContent = '🔊';
     if (!wordText) {
         speakBtn.disabled = true;
+    } else if (window.TTSController && typeof window.TTSController.speak === 'function') {
+        speakBtn.addEventListener('click', () => {
+            window.TTSController.speak(wordText, {
+                button: speakBtn,
+                source: 'word-screen',
+                priority: window.TTSController.PRIORITIES.NORMAL
+            });
+        });
     } else if (window.TTSManager && typeof window.TTSManager.speakWord === 'function') {
         speakBtn.addEventListener('click', () => {
             window.TTSManager.speakWord(wordText, {
@@ -875,7 +900,15 @@ function displayWord(word) {
         exampleBtn.className = 'tts-button word-tts-btn word-tts-example';
         exampleBtn.title = '朗读例句';
         exampleBtn.textContent = '🗣️';
-        if (window.TTSManager && typeof window.TTSManager.speakExample === 'function') {
+        if (window.TTSController && typeof window.TTSController.speak === 'function') {
+            exampleBtn.addEventListener('click', () => {
+                window.TTSController.speak(exampleText, {
+                    button: exampleBtn,
+                    source: 'word-screen-example',
+                    priority: window.TTSController.PRIORITIES.NORMAL
+                });
+            });
+        } else if (window.TTSManager && typeof window.TTSManager.speakExample === 'function') {
             exampleBtn.addEventListener('click', () => {
                 window.TTSManager.speakExample(exampleText, {
                     button: exampleBtn,

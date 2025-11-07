@@ -13,7 +13,9 @@
     F11: 'window.fullscreenToggle',
     Escape: 'ui.backOrExit',
     F1: 'help.toggle',
-    '?': 'help.open'
+    '?': 'help.open',
+    x: 'tts.stop',
+    X: 'tts.stop'
   });
 
   let map = { ...DEFAULT_MAP };
@@ -86,6 +88,8 @@
         return window.AppCommands?.flashcardPrev?.();
       case 'flashcard.next':
         return window.AppCommands?.flashcardNext?.();
+      case 'tts.stop':
+        return window.AppCommands?.ttsStop?.();
       default:
         // 支持通过事件总线触发自定义命令
         if (window.AppEvents) {
