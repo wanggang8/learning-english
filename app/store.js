@@ -31,7 +31,9 @@ const DEFAULT_STATE = {
       startedAt: null,
       events: [],
       // 新增：闪卡复习日志（查看/掌握度变化/收藏变化/编辑）
-      wordsReview: []
+      wordsReview: [],
+      // 学习模式会话记录
+      learning: []
     },
     archivedSessions: []
   },
@@ -940,6 +942,26 @@ function addWordReview(entry) {
   );
 }
 
+function updateSessionHistory(history) {
+  return runWithFallback(
+    'updateSessionHistory',
+    (error) => ({ success: false, error: error.message }),
+    () => {
+      if (typeof history !== 'object' || history === null) {
+        throw new Error('history must be an object');
+      }
+      
+      const cache = ensureSessionCache();
+      if (history.learning && Array.isArray(history.learning)) {
+        cache.activeSession.learning = history.learning.slice();
+      }
+      
+      flushSessionCache();
+      return { success: true };
+    }
+  );
+}
+
 function getSettings() {
   return runWithFallback(
     'getSettings',
@@ -1011,6 +1033,7 @@ module.exports = {
   clearHistory,
   clearSession,
   addSessionHistory,
+  updateSessionHistory,
   addWordReview,
   // 设置
   getSettings,

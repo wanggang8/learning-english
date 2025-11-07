@@ -47,6 +47,9 @@
   let prefs = { ...DEFAULT_PREFS };
   // 会话内对单词的临时修改（不持久化），按单词键合并覆盖
   const sessionOverrides = new Map();
+  // Learning mode session state
+  let sessionMode = false;
+  let sessionCallbacks = {};
 
   function getEl(id){ return document.getElementById(id); }
 
@@ -643,6 +646,12 @@
       renderCard();
       markReviewedForCurrent();
       maybeAutoRead('advance');
+      triggerCardAdvance();
+    } else {
+      // End of deck, trigger session end if in session mode
+      if (sessionMode) {
+        triggerSessionEnd();
+      }
     }
   }
 
@@ -659,6 +668,78 @@
       renderCard();
       markReviewedForCurrent();
       maybeAutoRead('rewind');
+    }
+  }
+
+  function loadDeck(words, options = {}) {
+    if (!Array.isArray(words)) {
+      console.error('loadDeck: words must be an array');
+      return false;
+    }
+
+    // Set session mode and callbacks
+    sessionMode = Boolean(options.sessionMode);
+    if (sessionMode && options.onCardAdvance) {
+      sessionCallbacks.onCardAdvance = options.onCardAdvance;
+    }
+    if (sessionMode && options.onSessionEnd) {
+      sessionCallbacks.onSessionEnd = options.onSessionEnd;
+    }
+
+    // Load the words
+    deck = buildDeck(words, options.order || prefs.order);
+    index = 0;
+    
+    // Apply session-specific preferences
+    if (options.defaultFace) {
+      prefs.defaultFace = options.defaultFace;
+    }
+    if (options.includeImages !== undefined) {
+      prefs.includeImages = options.includeImages;
+    }
+
+    setFaceByDefault();
+    renderCard();
+    
+    // Add learning progress indicator if in session mode
+    if (sessionMode) {
+      addLearningProgressIndicator();
+    }
+
+    return true;
+  }
+
+  function triggerCardAdvance() {
+    if (sessionMode && sessionCallbacks.onCardAdvance) {
+      const currentWord = deck[index];
+      sessionCallbacks.onCardAdvance(currentWord);
+    }
+  }
+
+  function triggerSessionEnd() {
+    if (sessionMode && sessionCallbacks.onSessionEnd) {
+      sessionCallbacks.onSessionEnd();
+    }
+    // Reset session state
+    sessionMode = false;
+    sessionCallbacks = {};
+    removeLearningProgressIndicator();
+  }
+
+  function addLearningProgressIndicator() {
+    const toolbar = document.querySelector('.flashcard-toolbar');
+    if (toolbar && !document.getElementById('fcLearningProgress')) {
+      const progressEl = document.createElement('div');
+      progressEl.id = 'fcLearningProgress';
+      progressEl.className = 'learning-progress';
+      toolbar.insertBefore(progressEl, toolbar.firstChild);
+    }
+  }
+
+  function removeLearningProgressIndicator() {
+    const progressEl = document.getElementById('fcLearningProgress');
+    if (progressEl) {
+      progressEl.remove();
     }
   }
 
@@ -820,7 +901,7 @@
   }
 
   // expose API
-  window.Flashcard = Object.freeze({ open, flip, next, prev, init });
+  window.Flashcard = Object.freeze({ open, flip, next, prev, init, loadDeck });
   // convenience global for inline onclick if needed
   window.openFlashcards = open;
 

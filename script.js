@@ -721,6 +721,51 @@ async function useTestData() {
     }
 }
 
+function switchToDrawMode() {
+    const drawTab = document.getElementById('drawTabBtn');
+    const learningTab = document.getElementById('learningTabBtn');
+    const drawContent = document.getElementById('drawModeContent');
+    const learningContent = document.getElementById('learningModeContent');
+
+    drawTab.classList.add('active');
+    learningTab.classList.remove('active');
+    drawContent.classList.add('active');
+    learningContent.classList.remove('active');
+}
+
+function switchToLearningMode() {
+    const drawTab = document.getElementById('drawTabBtn');
+    const learningTab = document.getElementById('learningTabBtn');
+    const drawContent = document.getElementById('drawModeContent');
+    const learningContent = document.getElementById('learningModeContent');
+
+    drawTab.classList.remove('active');
+    learningTab.classList.add('active');
+    drawContent.classList.remove('active');
+    learningContent.classList.add('active');
+}
+
+function startLearningSession(mode) {
+    if (!window.LearningMode) {
+        window.Feedback?.showError('学习模式模块未加载');
+        return;
+    }
+
+    if (mode === 'favorites') {
+        window.LearningMode.startSession('favorites');
+    } else if (mode === 'all') {
+        window.LearningMode.startSession('all');
+    } else if (mode === 'mastery') {
+        window.LearningMode.showMasteryRangeDialog((options) => {
+            window.LearningMode.startSession('mastery', options);
+        });
+    } else if (mode === 'tags') {
+        window.LearningMode.showTagSelectionDialog((selectedTags) => {
+            window.LearningMode.startSession('tags', { tags: selectedTags });
+        });
+    }
+}
+
 function switchScreen(screenId) {
     // Cancel any ongoing TTS when switching screens
     if (window.TTSController && typeof window.TTSController.cancelNavigationSpeech === 'function') {
@@ -737,6 +782,14 @@ function switchScreen(screenId) {
             'flashcardScreen': 'flashcard'
         };
         window.TTSController.setActiveMode(modeMap[screenId] || null);
+        
+        // Check if we're in learning mode context
+        if (screenId === 'flashcardScreen' && window.LearningMode) {
+            const session = window.LearningMode.getCurrentSession();
+            if (session) {
+                window.TTSController.setActiveMode('learning');
+            }
+        }
     }
     
     document.querySelectorAll('.screen').forEach((screen) => {

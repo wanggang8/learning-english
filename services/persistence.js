@@ -353,6 +353,10 @@ function addSessionHistory(entry) {
   return execute('addSessionHistory', (api) => api.addSessionHistory(entry));
 }
 
+function updateSessionHistory(history) {
+  return execute('updateSessionHistory', (api) => api.updateSessionHistory(history));
+}
+
 function addWordReview(entry) {
   return execute('addWordReview', (api) => api.addWordReview(entry));
 }
@@ -411,6 +415,7 @@ window.PersistenceService = Object.freeze({
   updatePartial,
   clearSession,
   addSessionHistory,
+  updateSessionHistory,
   addWordReview,
   startNewSession,
   clearHistory,

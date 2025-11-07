@@ -12,6 +12,7 @@ import './renderer/modules/ttsManager.js';
 // import './renderer/modules/ttsExtensionsDemo.js';
 import './renderer/modules/dataImporter.js';
 import './renderer/modules/drawStrategy.js';
+import './renderer/modules/learningMode.js';
 // 事件总线与命令
 import './renderer/modules/eventBus.js';
 import './renderer/modules/commands.js';
