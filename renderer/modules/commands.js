@@ -144,6 +144,18 @@
   function flashcardNext() { try { window.Flashcard && window.Flashcard.next && window.Flashcard.next(); } catch (e) {} }
   function flashcardPrev() { try { window.Flashcard && window.Flashcard.prev && window.Flashcard.prev(); } catch (e) {} }
 
+  // TTS commands
+  function ttsStop() {
+    try {
+      if (window.TTSController && typeof window.TTSController.stop === 'function') {
+        window.TTSController.stop({ reason: 'keyboard-shortcut', immediate: true });
+        if (window.Feedback) {
+          window.Feedback.showToast('已停止语音播报', window.Feedback.TOAST_TYPES?.INFO || 'info', 2000);
+        }
+      }
+    } catch (e) { console.error('ttsStop failed', e); }
+  }
+
   // 将命令暴露给其他模块（如 keyboardManager）
   window.AppCommands = Object.freeze({
     getActiveScreenId,
@@ -163,7 +175,9 @@
     flashcardOpen,
     flashcardFlip,
     flashcardNext,
-    flashcardPrev
+    flashcardPrev,
+    // tts
+    ttsStop
   });
 
   // 初始化全屏事件同步
@@ -189,5 +203,7 @@
     window.AppEvents.on('flashcard:flip', flashcardFlip);
     window.AppEvents.on('flashcard:next', flashcardNext);
     window.AppEvents.on('flashcard:prev', flashcardPrev);
+    // TTS events
+    window.AppEvents.on('tts:stop', ttsStop);
   }
 })();

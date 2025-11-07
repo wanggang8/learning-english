@@ -283,54 +283,82 @@
   }
 
   function speakCurrentWord() {
-    if (!window.TTSManager || typeof window.TTSManager.speakWord !== 'function') {
-      window.Feedback?.showWarning?.('语音播报不可用');
-      return;
-    }
     const current = deck[index];
     if (!current || !current.word) {
       window.Feedback?.showWarning?.('当前卡片没有可朗读的单词');
       return;
     }
-    window.TTSManager.speakWord(current.word, {
-      button: getEl(IDS.WORD_SPEAK_BTN),
-      source: 'flashcard-word'
-    });
+
+    // Use TTSController if available, fallback to TTSManager
+    if (window.TTSController && typeof window.TTSController.speak === 'function') {
+      window.TTSController.speak(current.word, {
+        button: getEl(IDS.WORD_SPEAK_BTN),
+        source: 'flashcard-word',
+        priority: window.TTSController.PRIORITIES.NORMAL
+      });
+    } else if (window.TTSManager && typeof window.TTSManager.speakWord === 'function') {
+      window.TTSManager.speakWord(current.word, {
+        button: getEl(IDS.WORD_SPEAK_BTN),
+        source: 'flashcard-word'
+      });
+    } else {
+      window.Feedback?.showWarning?.('语音播报不可用');
+    }
   }
 
   function speakExample() {
-    if (!window.TTSManager || typeof window.TTSManager.speakExample !== 'function') {
-      window.Feedback?.showWarning?.('语音播报不可用');
-      return;
-    }
     const current = deck[index];
     const exampleText = current?.example ? String(current.example).trim() : '';
     if (!exampleText) {
       window.Feedback?.showWarning?.('该卡片没有例句可朗读');
       return;
     }
-    window.TTSManager.speakExample(exampleText, {
-      button: getEl(IDS.EXAMPLE_SPEAK_BTN),
-      source: 'flashcard-example'
-    });
+
+    // Use TTSController if available, fallback to TTSManager
+    if (window.TTSController && typeof window.TTSController.speak === 'function') {
+      window.TTSController.speak(exampleText, {
+        button: getEl(IDS.EXAMPLE_SPEAK_BTN),
+        source: 'flashcard-example',
+        priority: window.TTSController.PRIORITIES.NORMAL
+      });
+    } else if (window.TTSManager && typeof window.TTSManager.speakExample === 'function') {
+      window.TTSManager.speakExample(exampleText, {
+        button: getEl(IDS.EXAMPLE_SPEAK_BTN),
+        source: 'flashcard-example'
+      });
+    } else {
+      window.Feedback?.showWarning?.('语音播报不可用');
+    }
   }
 
   function maybeAutoRead(reason) {
-    if (!window.TTSManager || typeof window.TTSManager.isAutoPlayEnabled !== 'function') {
-      return;
+    // Check TTSManager for auto-play setting (legacy support)
+    if (window.TTSManager && typeof window.TTSManager.isAutoPlayEnabled === 'function') {
+      if (!window.TTSManager.isAutoPlayEnabled()) {
+        return;
+      }
     }
-    if (!window.TTSManager.isAutoPlayEnabled()) {
-      return;
-    }
+
     const current = deck[index];
     if (!current || !current.word) {
       return;
     }
-    window.TTSManager.speakWord(current.word, {
-      button: getEl(IDS.WORD_SPEAK_BTN),
-      source: `flashcard-auto-${reason || 'advance'}`,
-      suppressQueuedToast: true
-    });
+
+    // Use TTSController if available, fallback to TTSManager
+    if (window.TTSController && typeof window.TTSController.speak === 'function') {
+      window.TTSController.speak(current.word, {
+        button: getEl(IDS.WORD_SPEAK_BTN),
+        source: `flashcard-auto-${reason || 'advance'}`,
+        priority: window.TTSController.PRIORITIES.LOW,
+        suppressErrorToast: true
+      });
+    } else if (window.TTSManager && typeof window.TTSManager.speakWord === 'function') {
+      window.TTSManager.speakWord(current.word, {
+        button: getEl(IDS.WORD_SPEAK_BTN),
+        source: `flashcard-auto-${reason || 'advance'}`,
+        suppressQueuedToast: true
+      });
+    }
   }
 
   function ensureToolbarControls(screen) {
@@ -553,6 +581,11 @@
   }
 
   function open() {
+    // Cancel any ongoing TTS when opening flashcards
+    if (window.TTSController && typeof window.TTSController.cancelNavigationSpeech === 'function') {
+      window.TTSController.cancelNavigationSpeech();
+    }
+    
     const sc = ensureScreen();
     prefs = getSettings();
     // initial deck with filters applied
@@ -568,6 +601,11 @@
     activateScreen(IDS.SCREEN);
     // ensure actions are bound (in case screen existed in HTML)
     ensureToolbarControls(sc);
+    
+    // Set active mode in TTSController
+    if (window.TTSController && typeof window.TTSController.setActiveMode === 'function') {
+      window.TTSController.setActiveMode('flashcard');
+    }
     }
 
   function markReviewedForCurrent() {
@@ -595,6 +633,11 @@
   function next() {
     if (!deck.length) return;
     if (index < deck.length - 1) {
+      // Cancel ongoing TTS when navigating
+      if (window.TTSController && typeof window.TTSController.cancelNavigationSpeech === 'function') {
+        window.TTSController.cancelNavigationSpeech();
+      }
+      
       index += 1;
       setFaceByDefault();
       renderCard();
@@ -606,6 +649,11 @@
   function prev() {
     if (!deck.length) return;
     if (index > 0) {
+      // Cancel ongoing TTS when navigating
+      if (window.TTSController && typeof window.TTSController.cancelNavigationSpeech === 'function') {
+        window.TTSController.cancelNavigationSpeech();
+      }
+      
       index -= 1;
       setFaceByDefault();
       renderCard();
